@@ -45,6 +45,7 @@ src/routes/
 ## Backend (Lovable Cloud)
 
 Enabled for auth only in this phase.
+
 - Email/password + Google sign-in on `/login` and `/signup`.
 - `signup.tsx` includes role dropdown (citizen/journalist/researcher/organization) stored in `profiles` table.
 - Tables: `profiles` (id → auth.users, role, created_at) with RLS (user can read/update own). Trigger to auto-create on signup.
@@ -78,3 +79,5 @@ Enabled for auth only in this phase.
 9. Laws, Help.
 10. Login / Signup wired to Cloud.
 11. Mobile pass + polish (glow, hover, skeletons).
+  Full stack Website All function for a global brand .I want to showcase for it for a hackathone
+12. &nbsp;
