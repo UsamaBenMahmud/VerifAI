@@ -235,7 +235,7 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
       ["source", result.source],
       ...result.riskFactors.map((r: any) => [`risk_${r.severity}`, r.titleEn]),
     ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rows.map((r) => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `verifai-report-${Date.now()}.csv`; a.click();
