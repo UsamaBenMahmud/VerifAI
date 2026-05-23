@@ -238,32 +238,82 @@ function CostTab() {
 }
 
 function FlaggedTab() {
-  const items = [
-    { id: "VAI-2026-0847", who: "Public figure (politician)", score: 8 },
-    { id: "VAI-2026-0844", who: "Central bank governor (voice)", score: 17 },
-    { id: "VAI-2026-0840", who: "News anchor", score: 34 },
+  const initial = [
+    { id: "VAI-2026-0847", who: "Public figure (politician)", score: 8, category: "Political", source: "bdnews-fake.xyz", credibility: 8, status: "pending" as Status },
+    { id: "VAI-2026-0844", who: "Central bank governor (voice)", score: 17, category: "Financial", source: "fakenews-bd.com", credibility: 12, status: "pending" as Status },
+    { id: "VAI-2026-0840", who: "News anchor", score: 34, category: "Media", source: "viral-bd.net", credibility: 24, status: "pending" as Status },
+    { id: "VAI-2026-0836", who: "Cricket celebrity", score: 22, category: "Celebrity", source: "fbpage_unverified", credibility: 18, status: "pending" as Status },
   ];
+  type Status = "pending" | "verified" | "authentic" | "hidden";
+  type Item = typeof initial[number];
+  const [items, setItems] = useState<Item[]>(initial);
+  const categories = ["Political", "Financial", "Media", "Celebrity", "Personal", "Other"];
+
+  const update = (id: string, patch: Partial<Item>) => {
+    setItems(items.map(it => it.id === id ? { ...it, ...patch } : it));
+    toast.success("Updated " + id);
+  };
+
+  const visible = items.filter(it => it.status !== "hidden");
+  const hiddenCount = items.length - visible.length;
+
   return (
     <div className="space-y-4">
-      <h2 className="font-display text-2xl font-bold">Flagged Reports</h2>
-      <p className="text-sm text-muted-foreground">Queue: Trust Score &lt; 20 on public figures requires human review.</p>
-      {items.map(it => (
-        <div key={it.id} className="glass rounded-xl p-5 flex flex-wrap items-center gap-4">
-          <div className="h-16 w-24 rounded bg-gradient-to-br from-danger/20 to-violet/20 border border-danger/30" />
-          <div className="flex-1 min-w-0">
-            <div className="font-mono text-xs text-cyan">{it.id}</div>
-            <div className="font-display">{it.who}</div>
-            <div className="text-xs text-muted-foreground">Trust score: <span className="text-danger font-bold">{it.score}/100</span></div>
+      <div className="flex items-end justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="font-display text-2xl font-bold">Flagged Reports</h2>
+          <p className="text-sm text-muted-foreground">Queue: trust score &lt; 35 on public figures requires human review.</p>
+        </div>
+        {hiddenCount > 0 && (
+          <button onClick={() => setItems(items.map(i => i.status === "hidden" ? { ...i, status: "pending" } : i))} className="text-xs text-cyan hover:underline">Restore {hiddenCount} hidden</button>
+        )}
+      </div>
+      {visible.map(it => (
+        <div key={it.id} className="glass rounded-xl p-5 space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="h-16 w-24 rounded bg-gradient-to-br from-danger/20 to-violet/20 border border-danger/30" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-xs text-cyan">{it.id}</span>
+                <StatusBadge status={it.status} />
+              </div>
+              <div className="font-display mt-1">{it.who}</div>
+              <div className="text-xs text-muted-foreground">Trust score: <span className="text-danger font-bold">{it.score}/100</span> · Source: <span className="font-mono text-cyan">{it.source}</span></div>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-xs">
+              <span className="text-muted-foreground uppercase tracking-widest">Category</span>
+              <select value={it.category} onChange={e => update(it.id, { category: e.target.value })} className="mt-1 w-full rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-2 py-1.5 text-sm">
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+            <label className="text-xs">
+              <span className="text-muted-foreground uppercase tracking-widest">Source credibility: <span className={it.credibility < 30 ? "text-danger" : it.credibility < 60 ? "text-warning" : "text-safe"}>{it.credibility}/100</span></span>
+              <input type="range" min={0} max={100} value={it.credibility} onChange={e => update(it.id, { credibility: Number(e.target.value) })} className="mt-1 w-full accent-cyan" />
+            </label>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button className="rounded-md bg-danger px-3 py-1.5 text-sm text-white">Confirm Deepfake</button>
-            <button className="rounded-md border border-safe text-safe px-3 py-1.5 text-sm">Authentic</button>
-            <button className="rounded-md border border-warning text-warning px-3 py-1.5 text-sm">Escalate</button>
+            <button onClick={() => update(it.id, { status: "verified" })} className="rounded-md bg-danger px-3 py-1.5 text-sm text-white">✓ Verify Deepfake</button>
+            <button onClick={() => update(it.id, { status: "authentic" })} className="rounded-md border border-safe text-safe px-3 py-1.5 text-sm hover:bg-safe/10">Mark Authentic</button>
+            <button onClick={() => update(it.id, { status: "hidden" })} className="rounded-md border border-warning text-warning px-3 py-1.5 text-sm hover:bg-warning/10">Hide from feed</button>
+            <button onClick={() => { navigator.clipboard?.writeText(it.id); toast.success("ID copied"); }} className="rounded-md border border-cyan/40 text-cyan px-3 py-1.5 text-sm hover:bg-cyan/10">Copy ID</button>
           </div>
         </div>
       ))}
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: "pending" | "verified" | "authentic" | "hidden" }) {
+  const map = {
+    pending: { c: "warning", l: "Pending review" },
+    verified: { c: "danger", l: "✓ Verified deepfake" },
+    authentic: { c: "safe", l: "Authentic" },
+    hidden: { c: "muted", l: "Hidden" },
+  } as const;
+  const s = map[status];
+  return <span className={`text-[10px] uppercase tracking-widest font-mono px-2 py-0.5 rounded bg-${s.c}/20 text-${s.c} border border-${s.c}/30`}>{s.l}</span>;
 }
 
 function ApiKeysTab() {
