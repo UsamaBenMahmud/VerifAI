@@ -380,12 +380,16 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
 }
 
 function EvidenceCard({ severity, title, detail }: { severity: Severity; title: string; detail: string }) {
-  const colorMap = { HIGH: "danger", MED: "warning", LOW: "safe" } as const;
-  const c = colorMap[severity];
+  const styles: Record<Severity, { border: string; bg: string; badge: string }> = {
+    HIGH: { border: "border-danger", bg: "bg-danger/5", badge: "bg-danger/20 text-danger" },
+    MED: { border: "border-warning", bg: "bg-warning/5", badge: "bg-warning/20 text-warning" },
+    LOW: { border: "border-safe", bg: "bg-safe/5", badge: "bg-safe/20 text-safe" },
+  };
+  const s = styles[severity];
   return (
-    <div className={`rounded-md border-l-4 border-${c} bg-${c}/5 p-3`}>
+    <div className={`rounded-md border-l-4 ${s.border} ${s.bg} p-3`}>
       <div className="flex items-center gap-2">
-        <span className={`text-[10px] uppercase tracking-widest font-mono px-2 py-0.5 rounded bg-${c}/20 text-${c}`}>[{severity}]</span>
+        <span className={`text-[10px] uppercase tracking-widest font-mono px-2 py-0.5 rounded ${s.badge}`}>[{severity}]</span>
         <span className="font-semibold text-sm">{title}</span>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
