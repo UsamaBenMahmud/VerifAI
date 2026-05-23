@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings } from "lucide-react";
+import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminAnalyses, hourly, agentPerf } from "@/lib/mockData";
 
