@@ -71,7 +71,7 @@ function H2({ children }: { children: React.ReactNode }) {
 }
 
 function Presentation() {
-  const slides = [
+  const defaultSlides = [
     "The Problem — 60M Users, Zero Protection",
     "Meet VerifAI — Bangla-First Detection",
     "Live Demo — Trust Score in Action",
@@ -81,23 +81,144 @@ function Presentation() {
     "KPIs & Accuracy Targets",
     "Roadmap — Build Locally, Lead Globally",
   ];
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deckUrl, setDeckUrl] = useState<string | null>(null);
+  const [deckName, setDeckName] = useState<string | null>(null);
+  const [slideImgs, setSlideImgs] = useState<string[]>([]);
+  const [active, setActive] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      const { data: p } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+      setIsAdmin(p?.role === "admin");
+    })();
+    setDeckUrl(localStorage.getItem("verifai-deck-url"));
+    setDeckName(localStorage.getItem("verifai-deck-name"));
+    try { setSlideImgs(JSON.parse(localStorage.getItem("verifai-deck-slides") || "[]")); } catch {}
+  }, []);
+
+  const readFile = (f: File) => new Promise<string>((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(f);
+  });
+
+  const onUploadDeck = async (f: File) => {
+    if (f.size > 10 * 1024 * 1024) { toast.error("Deck too large (max 10MB)"); return; }
+    try {
+      const b64 = await readFile(f);
+      localStorage.setItem("verifai-deck-url", b64);
+      localStorage.setItem("verifai-deck-name", f.name);
+      setDeckUrl(b64); setDeckName(f.name);
+      toast.success("Deck uploaded");
+    } catch { toast.error("Upload failed (storage full?)"); }
+  };
+
+  const onUploadSlides = async (files: FileList) => {
+    const imgs = await Promise.all(Array.from(files).slice(0, 20).map(readFile));
+    const next = [...slideImgs, ...imgs].slice(0, 20);
+    try {
+      localStorage.setItem("verifai-deck-slides", JSON.stringify(next));
+      setSlideImgs(next); toast.success(`${imgs.length} slide(s) added`);
+    } catch { toast.error("Storage full — try fewer/smaller images"); }
+  };
+
+  const clearAll = () => {
+    localStorage.removeItem("verifai-deck-url"); localStorage.removeItem("verifai-deck-name"); localStorage.removeItem("verifai-deck-slides");
+    setDeckUrl(null); setDeckName(null); setSlideImgs([]); toast.success("Cleared");
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <H2>Slide Deck</H2>
-        <button className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Download PDF Deck</button>
+        {deckUrl && (
+          <a href={deckUrl} download={deckName || "verifai-deck.pptx"} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Download Deck</a>
+        )}
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {slides.map((s, i) => (
-          <div key={s} className="glass rounded-xl aspect-video p-6 flex flex-col justify-between hover:border-cyan/40 transition relative group">
+
+      {isAdmin && (
+        <div className="glass rounded-2xl p-5 mb-6 border border-violet/30">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="font-display font-semibold text-violet">🛠️ Admin upload</div>
+            {(deckUrl || slideImgs.length > 0) && <button onClick={clearAll} className="inline-flex items-center gap-1 text-xs text-danger hover:underline"><Trash2 className="h-3 w-3" /> Clear all</button>}
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="border-2 border-dashed border-violet/40 rounded-lg p-4 text-center cursor-pointer hover:bg-violet/5">
+              <Upload className="h-5 w-5 text-violet mx-auto" />
+              <div className="mt-2 text-sm font-semibold">Upload PPTX / PDF</div>
+              <div className="text-xs text-muted-foreground">Max 10MB · saved to your browser</div>
+              <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" onChange={e => e.target.files?.[0] && onUploadDeck(e.target.files[0])} />
+            </label>
+            <label className="border-2 border-dashed border-violet/40 rounded-lg p-4 text-center cursor-pointer hover:bg-violet/5">
+              <Images className="h-5 w-5 text-violet mx-auto" />
+              <div className="mt-2 text-sm font-semibold">Upload Slide Images</div>
+              <div className="text-xs text-muted-foreground">PNG / JPG · up to 20</div>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={e => e.target.files && onUploadSlides(e.target.files)} />
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Main viewer */}
+      <div className="glass rounded-2xl p-4 mb-6">
+        {deckUrl ? (
+          deckUrl.startsWith("data:application/pdf") ? (
+            <iframe src={deckUrl} title={deckName || "deck"} className="w-full h-[70vh] rounded-lg bg-black" />
+          ) : (
+            <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex flex-col items-center justify-center text-center p-6">
+              <FileText className="h-12 w-12 text-cyan mb-3" />
+              <div className="font-display text-lg">{deckName}</div>
+              <p className="text-xs text-muted-foreground mt-1">PPTX preview not supported inline. Use the Download button above to view.</p>
+            </div>
+          )
+        ) : (
+          <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex items-center justify-center text-center p-6">
             <div>
-              <div className="font-mono text-xs text-cyan">SLIDE 0{i + 1}</div>
+              <FileText className="h-12 w-12 text-cyan mx-auto mb-3" />
+              <div className="font-display text-lg">No deck uploaded yet</div>
+              <p className="text-xs text-muted-foreground mt-1">{isAdmin ? "Use the admin upload above." : "Ask an admin to upload the deck."}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Slide card deck */}
+      <h3 className="font-display text-lg font-semibold mb-3">Deck Slides</h3>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {slideImgs.length > 0 ? slideImgs.map((src, i) => (
+          <button key={i} onClick={() => setActive(i)} className="glass rounded-xl overflow-hidden text-left hover:border-cyan/40 transition group">
+            <div className="aspect-video bg-black overflow-hidden">
+              <img src={src} alt={`Slide ${i + 1}`} className="h-full w-full object-cover group-hover:scale-105 transition" />
+            </div>
+            <div className="p-3 flex items-center justify-between">
+              <span className="font-mono text-xs text-cyan">SLIDE {String(i + 1).padStart(2, "0")}</span>
+              <span className="text-xs text-muted-foreground group-hover:text-cyan">⛶ Open</span>
+            </div>
+          </button>
+        )) : defaultSlides.map((s, i) => (
+          <div key={s} className="glass rounded-xl aspect-video p-6 flex flex-col justify-between hover:border-cyan/40 transition">
+            <div>
+              <div className="font-mono text-xs text-cyan">SLIDE {String(i + 1).padStart(2, "0")}</div>
               <div className="mt-3 font-display text-xl font-semibold">{s}</div>
             </div>
-            <button className="self-end text-xs text-muted-foreground hover:text-cyan">⛶ Full Screen</button>
+            <span className="self-end text-xs text-muted-foreground">Placeholder</span>
           </div>
         ))}
       </div>
+
+      {active !== null && slideImgs[active] && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setActive(null)}>
+          <div className="relative max-w-6xl w-full" onClick={e => e.stopPropagation()}>
+            <img src={slideImgs[active]} alt="" className="w-full rounded-lg" />
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <button onClick={() => setActive(Math.max(0, active - 1))} disabled={active === 0} className="text-cyan disabled:opacity-30">← Prev</button>
+              <span className="font-mono text-cyan">{active + 1} / {slideImgs.length}</span>
+              <button onClick={() => setActive(Math.min(slideImgs.length - 1, active + 1))} disabled={active === slideImgs.length - 1} className="text-cyan disabled:opacity-30">Next →</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
