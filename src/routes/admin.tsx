@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
-import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminAnalyses, hourly, agentPerf } from "@/lib/mockData";
+import { fetchSubmissionLinks, saveSubmissionLink, validateLink, extractYouTubeId, type LinkKey } from "@/lib/submissionLinks";
+import { linkSpec } from "@/lib/scoringData";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [
@@ -20,6 +22,7 @@ const sideLinks = [
   { id: "agents", label: "Agent Performance", icon: Bot },
   { id: "cost", label: "Cost & Usage", icon: DollarSign },
   { id: "flagged", label: "Flagged Reports", icon: Flag },
+  { id: "links", label: "Submission Links", icon: Link2 },
   { id: "apikeys", label: "API Keys", icon: Key },
   { id: "settings", label: "Settings", icon: Settings },
 ];
