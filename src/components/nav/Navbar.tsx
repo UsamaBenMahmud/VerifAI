@@ -26,15 +26,16 @@ export function Navbar() {
   const [role, setRole] = useState<"admin" | "user">("user");
 
   useEffect(() => {
-    const refresh = async (sessionUser?: { id: string; email: string | null } | null) => {
-      const u = sessionUser ?? (await supabase.auth.getUser()).data.user;
+    const refresh = async () => {
+      const { data } = await supabase.auth.getUser();
+      const u = data.user;
       if (!u) { setAuthed(null); setRole("user"); return; }
       setAuthed({ email: u.email ?? "", id: u.id });
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", u.id).maybeSingle();
       setRole(profile?.role === "admin" ? "admin" : "user");
     };
     refresh();
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => refresh(s?.user ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { refresh(); });
     return () => sub.subscription.unsubscribe();
   }, []);
 
