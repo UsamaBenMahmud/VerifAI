@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ScoringRouteImport } from './routes/scoring'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LawsRouteImport } from './routes/laws'
@@ -24,6 +25,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScoringRoute = ScoringRouteImport.update({
+  id: '/scoring',
+  path: '/scoring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
 }
 export interface FileRoutesByTo {
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
 }
 export interface FileRoutesById {
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
 }
 export interface FileRouteTypes {
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/laws'
     | '/login'
     | '/reset-password'
+    | '/scoring'
     | '/signup'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/laws'
     | '/login'
     | '/reset-password'
+    | '/scoring'
     | '/signup'
   id:
     | '__root__'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/laws'
     | '/login'
     | '/reset-password'
+    | '/scoring'
     | '/signup'
   fileRoutesById: FileRoutesById
 }
@@ -170,6 +182,7 @@ export interface RootRouteChildren {
   LawsRoute: typeof LawsRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ScoringRoute: typeof ScoringRoute
   SignupRoute: typeof SignupRoute
 }
 
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scoring': {
+      id: '/scoring'
+      path: '/scoring'
+      fullPath: '/scoring'
+      preLoaderRoute: typeof ScoringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -266,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   LawsRoute: LawsRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ScoringRoute: ScoringRoute,
   SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
