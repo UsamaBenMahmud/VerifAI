@@ -1,59 +1,139 @@
-## Scope
 
-Upgrade the existing `/detect` page in place. No new routes, no backend tables, no auth changes. All work is in `src/routes/detect.tsx` plus 2–3 small new components and i18n strings.
+# VerifAI Targeted Additions — Build Plan
 
-## 1. Real upload pipeline (replaces idle drop zone)
+Four scoped additions on top of the existing app. No rebuilds. Pure frontend + one small DB table for submission links.
 
-Three input modes in a tabbed UI: **File / URL / Camera**.
+---
 
-- **File**: `<input type=file>` accepting `image/jpeg,image/png,image/webp,video/mp4,video/avi,video/quicktime`. Validate ≤50MB. Show filename + size + type pill + thumbnail. For video, extract first frame via a hidden `<video>` seeked to 0.1s drawn onto a `<canvas>` → JPEG base64.
-- **URL**: text input + Paste button, regex-validated (`^https?://...`). Submitted as `{type:"url", url}`.
-- **Camera**: modal using `navigator.mediaDevices.getUserMedia({video:true})`, live `<video>` preview, Capture → canvas → base64, Retake, Use Photo. Stops tracks on close.
+## Part 1 — `/scoring` Hackathon Scorecard Page
 
-Submit calls `POST https://deepfake-api.vercel.app/analyze`; on network failure or non-2xx, fall back to HuggingFace `dima806/deepfake_vs_real_image_detection` with `Authorization: Bearer hf_demo` and the image base64. If both fail, surface error toast but still render mock results so the demo never breaks.
+**New route:** `src/routes/scoring.tsx` + helper data file `src/lib/scoringData.ts`.
 
-Error map (toast + inline red banner): network, oversize, no-face (from API response), unsupported MIME, 5xx, invalid URL — exact copy from the spec.
+**Layout**
+- Header: title, subtitle, badge row (Team / Track 5 / Max 175), animated counter `147/175`, cyan gradient progress bar (84%).
+- Two-column grid (`lg:grid-cols-[1fr_320px]`): left = accordion sections, right = sticky `Live Score Tracker` card with per-section subtotals, total, grade badge.
 
-## 2. Progress states
+**Left accordion** (shadcn `Accordion` already available):
+1. **Data Stack (40)** — Neo4j, pgvector, DuckDB, 4 scrapers, 4 parsers — each with detail card, code snippets, status badges.
+2. **AI Detail (68)** — 4 LLM cards, tabbed prompt strategy (system / user / Bangla / few-shot) with syntax-highlighted code blocks, token optimization bullets, 5 RAG technique cards with bonus badges, combo-bonus callout, frontend AI tools (5), workflow tools (4) + n8n diagram, local runtimes (3), local models (4).
+3. **Links (21)** — 5 link cards reading saved URLs from DB (read-only here; edited in admin). Show ✅/⏳ based on presence; YouTube card auto-renders thumbnail from URL.
+4. **Build Provenance (7)** — IDE table, MCP servers table, 3 prompt cards each with **Copy Prompt** button (writes to clipboard + toast).
 
-Replace the 4-agent ticker with a 6-step sequence keyed off the real fetch promise:
-1. 0–15% Uploading media
-2. 15–35% Vision Agent — facial regions
-3. 35–55% Metadata Agent — EXIF & watermarks
-4. 55–80% Context Agent — knowledge graph
-5. 80–95% Reasoning Agent — explanation
-6. 95–100% Analysis complete
+**Bonus Summary** card at bottom listing the 6 bonus items (+20 total).
 
-Animated cyan→violet gradient bar, glow on active step, ✓ on completed, live `Xs elapsed` counter (already present, retained).
+**Animated counter:** small `useCountUp` hook (requestAnimationFrame, 1.2s ease-out). No new deps.
 
-## 3. Results panel rebuild
+Add `{ to: "/scoring", label: "Scoring" }` to navbar links between Docs and Admin.
 
-Keep `TrustGauge` component. Wrap score in 3 bands (0–30 red, 31–69 amber, 70–100 green) with bilingual labels and `94.2% ± 3.1%` confidence line.
+---
 
-New blocks added below gauge:
+## Part 2 — `/login` Rebuild (User + Admin tabs)
 
-- **Sub-scores (4 cards)**: Vision / Metadata / Knowledge Match / Audio Sync — icon, bilingual label, colored progress bar, detail line. Exact copy from spec.
-- **Evidence panel (collapsible, open by default)**: 5 risk-factor cards with `[HIGH]/[MED]/[LOW]` severity badges, bilingual descriptions.
-- **Face heatmap** (existing SVG kept) + new color legend row + bilingual caption.
-- **Spread timeline**: horizontal 4-node SVG/flex timeline (Day 0–3) with colored dots and disclaimer note.
-- **Model comparison toggle**: button reveals a 4-row table (EfficientNet-B0 / ResNet-50 / ViT-B/16 / Consensus) with score, speed, confidence, plus red "All 3 models agree" banner (bilingual).
-- **Action row**: keep existing 4 buttons, add **Compare Models** and **Newsroom Export (CSV)** (CSV built client-side from the current result and downloaded via Blob URL).
-- **About VerifAI** collapsible at bottom with the provided technology / training data / architecture copy.
+Replace `src/routes/login.tsx` entirely. Keep existing Supabase auth calls and Google OAuth helper that's already wired.
 
-All Bangla strings added to `src/lib/i18n.tsx` and consumed via `useLang()` so the existing language toggle drives them.
+**Route search param:** `validateSearch` → `{ mode?: "user" | "admin" }`. `/login?mode=admin` pre-selects Admin tab.
 
-## 4. Technical notes (for engineering)
+**Outer:** existing `GridBackground` + floating cyan/violet orbs; single `max-w-md` glass card centered.
 
-- All code stays client-side; no server functions, no Supabase changes, no new env vars.
-- New tiny components colocated in `src/components/detect/`: `CameraModal.tsx`, `SubScoreCard.tsx`, `EvidenceCard.tsx`, `SpreadTimeline.tsx`, `ModelComparison.tsx`. `detect.tsx` orchestrates.
-- HF call body: `{ inputs: <base64> }`; map its `[{label:"Fake"|"Real", score}]` shape into our internal `AnalysisResult` (score 0–100, sub-scores, risk factors). Primary API assumed to return a richer shape; we'll normalize behind one `analyze(input)` helper in `src/lib/detectApi.ts`.
-- Mock result object (current hard-coded numbers) becomes the fallback returned by `analyze()` on failure so the rest of the UI is data-driven.
-- Camera modal cleans up `MediaStream` tracks on unmount/close to avoid the webcam LED staying on.
-- CSV export: `Blob([...], {type:"text/csv"})` + `URL.createObjectURL` + temporary `<a download>`.
-- Console errors silenced in production via existing build; only `toast.error` surfaces to user.
+**Top tab pills** (User / Admin) with animated cyan underline (CSS transform, no library).
 
-## Out of scope
+### User tab
+Sub-tabs `Sign In | Create Account` (text-link style).
 
-- No changes to other routes, auth, RLS, or `mockData.ts` consumers elsewhere.
-- No PDF generator wiring — existing toast stub kept.
-- Telegram bot card kept as-is.
+- **Sign In:** email, password (eye toggle), forgot-password link → `/forgot-password`, primary Sign In button, divider, Google OAuth ghost button, footer link to Create Account.
+- **Create Account:** full name, email, password + strength meter (regex-based weak/fair/strong), confirm-password with ✓ on match, role `<select>` (Citizen / Journalist / Researcher / Org / Law Enforcement), 2 checkboxes (ToS, newsletter), primary Create button.
+
+After success: `toast.success("Welcome back! Ready to detect deepfakes.")`, navigate `/detect`.
+
+### Admin tab
+Visual change: card border switches to `--danger` glow, orbs swap to red pulse (CSS class toggle).
+
+- Red "🔒 RESTRICTED ACCESS" banner (EN + BN).
+- Admin email, password (eye toggle), **2FA code** input (6 digits, auto-space after 3, demo accepts `000000`).
+- Red Sign In button. No signup, no Google.
+- Footer muted text (invitation-only / contact / audited).
+
+Auth flow: Supabase `signInWithPassword` → check `profiles.role === 'admin'` → require 2FA code `000000` in demo. On success: toast "Admin session started. All actions are logged.", navigate `/admin`, set `sessionStorage.adminSessionStart = Date.now()` (used by navbar timer).
+
+### Supporting routes
+- **`/forgot-password`** new route: email input, `supabase.auth.resetPasswordForEmail` with redirect to `/reset-password`. Bangla heading.
+- **`/reset-password`** new route: detects recovery hash, new password input, `supabase.auth.updateUser({ password })`.
+
+---
+
+## Part 3 — Navbar Update
+
+Edit `src/components/nav/Navbar.tsx`:
+
+- Insert `Scoring` link between Docs and Admin.
+- Replace simple Login/Logout button with auth-state-aware right cluster:
+  - **Logged out:** `[Login]` ghost + `[Try Free →]` cyan (both link to /login, second with `?mode=signup` hint).
+  - **User logged in:** circular avatar with initial → dropdown (Profile / My Analyses / Logout). Use shadcn `DropdownMenu`.
+  - **Admin logged in:** red `🔐 Admin` badge + avatar dropdown (Admin Panel / Session Log / Logout) + live `Session: MM:SS` countdown from `sessionStorage.adminSessionStart` (30-minute window, turns red <5min, auto-logout at 0).
+- Mobile menu mirrors all links + auth state.
+
+Role detection: fetch `profiles.role` once on session change, cached in component state.
+
+---
+
+## Part 4 — Admin Panel: Submission Links Manager
+
+**DB migration** — new table `submission_links`:
+- Columns: `key` (text, PK — one of `youtube|github|demo|figma|huggingface|api_docs|n8n`), `url` (text, nullable), `updated_at`.
+- RLS: anyone authenticated can `SELECT` (so `/scoring` reads it); only `profiles.role = 'admin'` can `INSERT`/`UPDATE` via `has_role()`-style check.
+- Seed 7 empty rows.
+
+**Admin sidebar:** add `{ id: "links", label: "Submission Links", icon: Link2 }` to `sideLinks` in `src/routes/admin.tsx`.
+
+**New `LinksTab` component:** 7 fields, each with:
+- Input + per-field `[Save]` button.
+- URL validation (regex per type: youtube.com|youtu.be, github.com, https://, figma.com).
+- Status pill: ✅ Saved / ⏳ Pending / ❌ Invalid.
+- Live preview: YouTube → `img.youtube.com/vi/{id}/hqdefault.jpg`; others → favicon via `https://www.google.com/s2/favicons?domain=...`.
+- Bottom `[Save All Links]` primary button → batch upsert → toast "Links saved and published to scoring page".
+
+`/scoring` Links section reads the same table so admin edits appear live.
+
+---
+
+## Technical Section
+
+**Files created**
+- `src/routes/scoring.tsx`
+- `src/routes/forgot-password.tsx`
+- `src/routes/reset-password.tsx`
+- `src/lib/scoringData.ts` (all card content as typed arrays)
+- `src/lib/useCountUp.ts`
+- `src/lib/submissionLinks.ts` (fetch + upsert helpers)
+- `src/components/scoring/*` (AccordionSection, ScoreCard, RagCard, PromptTabs, CopyPromptButton, BonusSummary)
+- `src/components/auth/UserTab.tsx`, `AdminTab.tsx`, `PasswordStrength.tsx`
+- `src/components/nav/UserMenu.tsx`, `AdminSessionTimer.tsx`
+
+**Files edited**
+- `src/routes/login.tsx` (full rewrite, same path)
+- `src/routes/admin.tsx` (add Links tab + LinksTab component inline)
+- `src/components/nav/Navbar.tsx` (links + auth state UI)
+
+**DB migration**
+```sql
+CREATE TABLE public.submission_links (
+  key text PRIMARY KEY,
+  url text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.submission_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read" ON public.submission_links FOR SELECT USING (true);
+CREATE POLICY "admin write" ON public.submission_links
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+INSERT INTO public.submission_links(key) VALUES
+  ('youtube'),('github'),('demo'),('figma'),
+  ('huggingface'),('api_docs'),('n8n');
+```
+
+**No new npm dependencies.** Uses existing shadcn `Accordion`, `Tabs`, `DropdownMenu`, `Select`, `Input`, `Button`, `Checkbox`, sonner toast, lucide icons, recharts (already in admin).
+
+**Design tokens:** all colors via existing `--cyan`, `--violet`, `--danger`, `--bg-deep`, `glass`, `glass-strong` utilities — no raw hex.
+
+**Out of scope:** real 2FA (demo accepts `000000`), real Neo4j/DuckDB integration (scoring page is presentational content describing the stack).
