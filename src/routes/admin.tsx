@@ -50,9 +50,120 @@ function AdminPage() {
         {tab === "agents" && <AgentsTab />}
         {tab === "cost" && <CostTab />}
         {tab === "flagged" && <FlaggedTab />}
+        {tab === "links" && <LinksTab />}
         {tab === "apikeys" && <ApiKeysTab />}
         {tab === "settings" && <SettingsTab />}
       </section>
+    </div>
+  );
+}
+
+function LinksTab() {
+  const [vals, setVals] = useState<Record<LinkKey, string>>({
+    youtube: "", github: "", demo: "", figma: "", huggingface: "", api_docs: "", n8n: "",
+  });
+  const [saved, setSaved] = useState<Record<LinkKey, string | null>>({
+    youtube: null, github: null, demo: null, figma: null, huggingface: null, api_docs: null, n8n: null,
+  });
+  const [busy, setBusy] = useState<LinkKey | "all" | null>(null);
+
+  useEffect(() => {
+    fetchSubmissionLinks().then((r) => {
+      setSaved(r);
+      setVals((v) => {
+        const next = { ...v };
+        (Object.keys(r) as LinkKey[]).forEach((k) => { next[k] = r[k] ?? ""; });
+        return next;
+      });
+    });
+  }, []);
+
+  const saveOne = async (k: LinkKey) => {
+    const url = vals[k].trim();
+    if (url && !validateLink(k, url)) return toast.error(`Invalid URL for ${k}`);
+    setBusy(k);
+    const { error } = await saveSubmissionLink(k, url || null);
+    setBusy(null);
+    if (error) return toast.error(error.message);
+    setSaved((s) => ({ ...s, [k]: url || null }));
+    toast.success(`${k} saved`);
+  };
+
+  const saveAll = async () => {
+    setBusy("all");
+    for (const s of linkSpec) {
+      const url = vals[s.key].trim();
+      if (url && !validateLink(s.key, url)) { toast.error(`Invalid URL for ${s.key}`); continue; }
+      await saveSubmissionLink(s.key, url || null);
+    }
+    const r = await fetchSubmissionLinks();
+    setSaved(r);
+    setBusy(null);
+    toast.success("Links saved and published to scoring page");
+  };
+
+  const statusOf = (k: LinkKey) => {
+    const v = vals[k].trim();
+    if (!v) return saved[k] ? { tone: "safe", label: "✅ Saved" } : { tone: "warning", label: "⏳ Pending" };
+    if (!validateLink(k, v)) return { tone: "danger", label: "❌ Invalid URL" };
+    if (saved[k] === v) return { tone: "safe", label: "✅ Saved" };
+    return { tone: "warning", label: "⏳ Unsaved changes" };
+  };
+
+  const previewFor = (k: LinkKey, url: string | null) => {
+    if (!url || !validateLink(k, url)) return null;
+    if (k === "youtube") {
+      const id = extractYouTubeId(url);
+      if (id) return <img src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`} alt="" className="mt-2 max-w-[200px] rounded border border-[color:var(--border)]" loading="lazy" />;
+    }
+    try {
+      const host = new URL(url).hostname;
+      return (
+        <div className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`} alt="" className="h-4 w-4" />
+          <span>{host}</span>
+        </div>
+      );
+    } catch { return null; }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-display text-2xl font-bold">Submission Links</h2>
+        <p className="text-sm text-muted-foreground">Fill these in before submission. They appear live on the <Link to="/scoring" className="text-cyan hover:underline">/scoring</Link> page.</p>
+      </div>
+      <div className="space-y-3">
+        {linkSpec.map((spec) => {
+          const st = statusOf(spec.key);
+          return (
+            <div key={spec.key} className="glass rounded-xl p-4 space-y-2">
+              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <label className="font-display font-semibold">{spec.label} <span className="text-xs text-cyan font-mono">+{spec.points}</span></label>
+                <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded border bg-${st.tone}/15 text-${st.tone} border-${st.tone}/40`}>{st.label}</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={vals[spec.key]}
+                  onChange={(e) => setVals({ ...vals, [spec.key]: e.target.value })}
+                  placeholder={spec.helper}
+                  className="flex-1 rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-3 py-2 text-sm focus:border-cyan focus:ring-2 focus:ring-cyan/30 outline-none"
+                />
+                <button onClick={() => saveOne(spec.key)} disabled={busy !== null}
+                  className="rounded-md bg-cyan/15 border border-cyan/40 text-cyan px-3 py-2 text-sm hover:bg-cyan/25 disabled:opacity-50">
+                  {busy === spec.key ? "..." : "Save"}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-mono">{spec.helper}</p>
+              {previewFor(spec.key, vals[spec.key].trim() || saved[spec.key])}
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={saveAll} disabled={busy !== null}
+        className="w-full rounded-md bg-cyan py-2.5 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan disabled:opacity-50">
+        {busy === "all" ? "Saving..." : "Save All Links"}
+      </button>
     </div>
   );
 }
