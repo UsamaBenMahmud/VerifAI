@@ -38,6 +38,24 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_links: {
+        Row: {
+          key: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
