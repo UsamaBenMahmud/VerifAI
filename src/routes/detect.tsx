@@ -187,7 +187,7 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
           <div className="text-xs uppercase tracking-widest font-mono" style={{ color: band.color }}>{t(band.en, band.bn, lang)}</div>
           <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold">{t(band.en.replace(/^[^A-Za-z]+/, ""), band.bn.replace(/^[^\u0980-\u09FF]+/, ""), lang)}</h2>
           <p className="mt-3 text-sm text-muted-foreground font-mono">{t("Confidence", "আত্মবিশ্বাস", lang)}: {result.confidence.toFixed(1)}% ± {result.confidenceMargin.toFixed(1)}%</p>
-          {preview && <img src={preview} alt="analyzed" className="mt-4 max-h-32 rounded-md border border-[color:var(--border)]" />}
+          {preview && <video src={preview} controls className="mt-4 max-h-40 rounded-md border border-[color:var(--border)] bg-black" />}
           <p className="mt-3 text-xs text-muted-foreground">{t("Analyzed via", "বিশ্লেষণ", lang)}: <span className="font-mono text-cyan">{result.source}</span></p>
         </div>
       </div>
