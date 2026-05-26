@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserMenu } from "@/components/nav/UserMenu";
 import { AdminSessionTimer } from "@/components/nav/AdminSessionTimer";
 
-const links = [
+const baseLinks = [
   { to: "/", label: "Home" },
   { to: "/detect", label: "Detect" },
   { to: "/dashboard", label: "Dashboard" },
@@ -15,8 +15,8 @@ const links = [
   { to: "/help", label: "Help" },
   { to: "/docs", label: "Docs" },
   { to: "/scoring", label: "Scoring" },
-  { to: "/admin", label: "Admin" },
 ] as const;
+const adminLink = { to: "/admin", label: "Admin" } as const;
 
 export function Navbar() {
   const { lang, toggle } = useLang();
