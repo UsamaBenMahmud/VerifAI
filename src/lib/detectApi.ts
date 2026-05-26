@@ -152,14 +152,15 @@ async function tryHF(input: AnalyzeInput, signal: AbortSignal): Promise<Analysis
 async function tryServer(input: AnalyzeInput, signal: AbortSignal): Promise<AnalysisResult | null> {
   if (input.kind !== "image") return null;
   try {
+    const upload = await prepareImageForUpload(input.base64, input.mime);
     // base64 data URL -> Blob
-    const b64 = stripBase64Prefix(input.base64);
+    const b64 = stripBase64Prefix(upload.base64);
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], { type: input.mime });
+    const blob = new Blob([bytes], { type: upload.mime });
     const fd = new FormData();
-    fd.append("file", blob, `upload.${input.mime.split("/")[1] || "jpg"}`);
+    fd.append("file", blob, `upload.${upload.mime.split("/")[1] || "jpg"}`);
     const res = await fetch("/api/analyze-image", { method: "POST", body: fd, signal });
     if (!res.ok) return null;
     const d = await res.json();
@@ -190,6 +191,29 @@ async function tryServer(input: AnalyzeInput, signal: AbortSignal): Promise<Anal
   } catch {
     return null;
   }
+}
+
+async function prepareImageForUpload(base64: string, mime: string): Promise<{ base64: string; mime: string }> {
+  if (typeof document === "undefined") return { base64, mime };
+  const image = new Image();
+  image.decoding = "async";
+  image.src = base64;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("image load failed"));
+  });
+
+  const maxSide = 768;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+  const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+  const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { base64, mime };
+  ctx.drawImage(image, 0, 0, width, height);
+  return { base64: canvas.toDataURL("image/jpeg", 0.82), mime: "image/jpeg" };
 }
 
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {

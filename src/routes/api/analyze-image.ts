@@ -2,7 +2,6 @@
 // upload to Storage → call HF deepfake model → call Lovable AI for bilingual
 // explanation → save to DB → return result.
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +14,13 @@ function json(body: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json", ...CORS },
   });
+}
+
+function normalizeHfSpaceUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim().replace(/\/$/, "");
+  const match = trimmed.match(/^https:\/\/huggingface\.co\/spaces\/([^/]+)\/([^/]+)$/i);
+  if (!match) return trimmed;
+  return `https://${match[1]}-${match[2]}.hf.space`;
 }
 
 export const Route = createFileRoute("/api/analyze-image")({
@@ -36,6 +42,7 @@ export const Route = createFileRoute("/api/analyze-image")({
           if (!(file instanceof File)) return json({ error: "No file provided" }, 400);
           if (!file.type.startsWith("image/")) return json({ error: "Only images allowed" }, 400);
           if (file.size > 10 * 1024 * 1024) return json({ error: "Max 10MB" }, 400);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
           // 2. Upload to Storage
           const fileName = `${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
@@ -52,7 +59,7 @@ export const Route = createFileRoute("/api/analyze-image")({
           const imageUrl = urlData.signedUrl;
 
           // 3. Call Hugging Face model
-          const modelResult = await callDeepfakeModel(file, buffer, HF_MODEL_URL);
+          const modelResult = await callDeepfakeModel(file, buffer, normalizeHfSpaceUrl(HF_MODEL_URL));
 
           // 4. Generate bilingual explanation via Lovable AI
           const explanation = await generateBilingualExplanation(modelResult, LOVABLE_API_KEY);
@@ -118,16 +125,7 @@ async function callDeepfakeModel(
   const base64 = bytesToBase64(new Uint8Array(buffer));
   const dataUrl = `data:${file.type};base64,${base64}`;
 
-  const res = await fetch(`${hfUrl.replace(/\/$/, "")}/run/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data: [dataUrl] }),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`HF model error ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  const result = (await res.json()) as { data?: unknown[] };
+  const result = await callGradioPredict(hfUrl, dataUrl);
   const payload = result.data?.[0];
   if (!payload || typeof payload !== "object") {
     throw new Error("HF model returned unexpected shape");
@@ -142,6 +140,45 @@ async function callDeepfakeModel(
     confidence: Number(p.confidence ?? 0),
     model_version: String(p.model_version ?? "unknown"),
   };
+}
+
+async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data?: unknown[] }> {
+  const body = JSON.stringify({ data: [dataUrl] });
+  const endpointBase = hfUrl.replace(/\/$/, "");
+  const directPaths = ["/run/predict", "/api/predict", "/gradio_api/run/predict", "/gradio_api/api/predict"];
+  let lastError = "";
+
+  for (const path of directPaths) {
+    const res = await fetch(`${endpointBase}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (res.ok) return (await res.json()) as { data?: unknown[] };
+    lastError = `HF model error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`;
+  }
+
+  const queued = await fetch(`${endpointBase}/gradio_api/call/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (!queued.ok) {
+    const txt = await queued.text().catch(() => "");
+    throw new Error(`HF model error ${queued.status}: ${txt.slice(0, 200) || lastError}`);
+  }
+  const { event_id } = (await queued.json()) as { event_id?: string };
+  if (!event_id) throw new Error("HF model did not return a queue event ID");
+
+  const stream = await fetch(`${endpointBase}/gradio_api/call/predict/${event_id}`);
+  if (!stream.ok) {
+    const txt = await stream.text().catch(() => "");
+    throw new Error(`HF model queue error ${stream.status}: ${txt.slice(0, 200)}`);
+  }
+  const text = await stream.text();
+  const complete = text.match(/event:\s*complete\s*\ndata:\s*(.+)/);
+  if (!complete) throw new Error(`HF model queue failed: ${text.slice(0, 200)}`);
+  return JSON.parse(complete[1]) as { data?: unknown[] };
 }
 
 // ----- Lovable AI Gateway (Gemini) for bilingual explanation -----
