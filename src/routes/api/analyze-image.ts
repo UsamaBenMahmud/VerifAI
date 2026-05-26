@@ -145,19 +145,8 @@ async function callDeepfakeModel(
 async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data?: unknown[] }> {
   const body = JSON.stringify({ data: [dataUrl] });
   const endpointBase = hfUrl.replace(/\/$/, "");
-  const directPaths = ["/run/predict", "/api/predict", "/gradio_api/run/predict", "/gradio_api/api/predict"];
-  let lastError = "";
 
-  for (const path of directPaths) {
-    const res = await fetch(`${endpointBase}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    if (res.ok) return (await res.json()) as { data?: unknown[] };
-    lastError = `HF model error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`;
-  }
-
+  // Gradio 4+ queue flow: enqueue, then SSE-poll for result.
   const queued = await fetch(`${endpointBase}/gradio_api/call/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -165,7 +154,7 @@ async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data
   });
   if (!queued.ok) {
     const txt = await queued.text().catch(() => "");
-    throw new Error(`HF model error ${queued.status}: ${txt.slice(0, 200) || lastError}`);
+    throw new Error(`HF model error ${queued.status}: ${txt.slice(0, 200)}`);
   }
   const { event_id } = (await queued.json()) as { event_id?: string };
   if (!event_id) throw new Error("HF model did not return a queue event ID");
@@ -176,9 +165,24 @@ async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data
     throw new Error(`HF model queue error ${stream.status}: ${txt.slice(0, 200)}`);
   }
   const text = await stream.text();
-  const complete = text.match(/event:\s*complete\s*\ndata:\s*(.+)/);
-  if (!complete) throw new Error(`HF model queue failed: ${text.slice(0, 200)}`);
-  return JSON.parse(complete[1]) as { data?: unknown[] };
+  // Parse SSE frames; find the `complete` event.
+  const frames = text.split("\n\n");
+  for (const frame of frames) {
+    let eventName = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) eventName = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (eventName === "complete") {
+      const parsed = JSON.parse(dataLines.join("\n")) as unknown[];
+      return { data: parsed };
+    }
+    if (eventName === "error") {
+      throw new Error(`HF model returned error: ${dataLines.join("\n").slice(0, 200)}`);
+    }
+  }
+  throw new Error(`HF model queue failed: ${text.slice(0, 200)}`);
 }
 
 // ----- Lovable AI Gateway (Gemini) for bilingual explanation -----
