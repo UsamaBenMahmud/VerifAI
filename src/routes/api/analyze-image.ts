@@ -2,7 +2,6 @@
 // upload to Storage → call HF deepfake model → call Lovable AI for bilingual
 // explanation → save to DB → return result.
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +35,7 @@ export const Route = createFileRoute("/api/analyze-image")({
           if (!(file instanceof File)) return json({ error: "No file provided" }, 400);
           if (!file.type.startsWith("image/")) return json({ error: "Only images allowed" }, 400);
           if (file.size > 10 * 1024 * 1024) return json({ error: "Max 10MB" }, 400);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
           // 2. Upload to Storage
           const fileName = `${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
