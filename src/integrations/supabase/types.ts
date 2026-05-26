@@ -16,57 +16,90 @@ export type Database = {
     Tables: {
       analyses: {
         Row: {
+          admin_notes: string | null
           analysis_time_ms: number | null
+          category: string | null
+          claude_latency_ms: number | null
           confidence: number | null
+          content_type: string | null
           created_at: string
           expires_at: string
           explanation_bn: string | null
           explanation_en: string | null
           fake_probability: number | null
           file_size_bytes: number | null
+          hf_latency_ms: number | null
+          human_verdict: string | null
           id: string
           image_url: string
+          is_visible: boolean | null
           model_version: string | null
           original_filename: string | null
           real_probability: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_credibility_score: number | null
+          source_domain: string | null
           trust_score: number | null
           user_id: string | null
           verdict: string | null
           verdict_bn: string | null
         }
         Insert: {
+          admin_notes?: string | null
           analysis_time_ms?: number | null
+          category?: string | null
+          claude_latency_ms?: number | null
           confidence?: number | null
+          content_type?: string | null
           created_at?: string
           expires_at?: string
           explanation_bn?: string | null
           explanation_en?: string | null
           fake_probability?: number | null
           file_size_bytes?: number | null
+          hf_latency_ms?: number | null
+          human_verdict?: string | null
           id?: string
           image_url: string
+          is_visible?: boolean | null
           model_version?: string | null
           original_filename?: string | null
           real_probability?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_credibility_score?: number | null
+          source_domain?: string | null
           trust_score?: number | null
           user_id?: string | null
           verdict?: string | null
           verdict_bn?: string | null
         }
         Update: {
+          admin_notes?: string | null
           analysis_time_ms?: number | null
+          category?: string | null
+          claude_latency_ms?: number | null
           confidence?: number | null
+          content_type?: string | null
           created_at?: string
           expires_at?: string
           explanation_bn?: string | null
           explanation_en?: string | null
           fake_probability?: number | null
           file_size_bytes?: number | null
+          hf_latency_ms?: number | null
+          human_verdict?: string | null
           id?: string
           image_url?: string
+          is_visible?: boolean | null
           model_version?: string | null
           original_filename?: string | null
           real_probability?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_credibility_score?: number | null
+          source_domain?: string | null
           trust_score?: number | null
           user_id?: string | null
           verdict?: string | null
@@ -74,27 +107,84 @@ export type Database = {
         }
         Relationships: []
       }
+      presentations: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_size_bytes: number | null
+          id: string
+          is_active: boolean | null
+          original_filename: string | null
+          slide_count: number | null
+          slide_image_urls: string[] | null
+          title: string
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          is_active?: boolean | null
+          original_filename?: string | null
+          slide_count?: number | null
+          slide_image_urls?: string[] | null
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          is_active?: boolean | null
+          original_filename?: string | null
+          slide_count?: number | null
+          slide_image_urls?: string[] | null
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          analyses_count: number | null
           created_at: string
           display_name: string | null
           email: string | null
+          full_name: string | null
           id: string
+          is_admin: boolean | null
+          organization: string | null
           role: string
+          updated_at: string | null
         }
         Insert: {
+          analyses_count?: number | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          full_name?: string | null
           id: string
+          is_admin?: boolean | null
+          organization?: string | null
           role?: string
+          updated_at?: string | null
         }
         Update: {
+          analyses_count?: number | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          full_name?: string | null
           id?: string
+          is_admin?: boolean | null
+          organization?: string | null
           role?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -129,9 +219,24 @@ export type Database = {
         }
         Relationships: []
       }
+      public_feed: {
+        Row: {
+          category: string | null
+          confidence: number | null
+          created_at: string | null
+          human_verdict: string | null
+          id: string | null
+          source_credibility_score: number | null
+          source_domain: string | null
+          trust_score: number | null
+          verdict: string | null
+          verdict_bn: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
