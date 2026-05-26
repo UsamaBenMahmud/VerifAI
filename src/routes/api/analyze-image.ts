@@ -223,19 +223,37 @@ async function callDeepfakeModel(
   }
 }
 
-// HF Space returns a single string like "FAKE (87.2%) ⚠️" or "REAL (92.1%) ✅"
-// or "❌ Video read failed". Parse into a structured ModelResult.
+// HF Space may return:
+//   "FAKE (87.2%) ⚠️"            (single label + pct)
+//   "REAL: 0.56% | FAKE: 99.44%"  (both labels)
+//   { label: "FAKE", confidence: 0.872 }  (structured)
+// Always derive fake_probability directly from a FAKE match when present.
 function parseVerdict(payload: unknown): ModelResult {
   const raw = typeof payload === "string" ? payload : JSON.stringify(payload ?? "");
-  const m = raw.match(/(REAL|FAKE)[^\d]*?(\d+(?:\.\d+)?)/i);
-  if (!m) throw new Error(`Could not parse HF verdict: ${raw.slice(0, 200)}`);
-  const label = m[1].toUpperCase();
-  const pct = Math.max(0, Math.min(100, parseFloat(m[2])));
-  const isFake = label === "FAKE";
-  const fakeProb = isFake ? pct / 100 : 1 - pct / 100;
+  console.log("[analyze-image] HF raw verdict:", raw.slice(0, 500));
+
+  // Find every label→number pair in the string
+  const pairs: Array<{ label: "REAL" | "FAKE"; pct: number }> = [];
+  const re = /(REAL|FAKE)[^\d-]*?(\d+(?:\.\d+)?)/gi;
+  let mm: RegExpExecArray | null;
+  while ((mm = re.exec(raw)) !== null) {
+    const label = mm[1].toUpperCase() as "REAL" | "FAKE";
+    let n = parseFloat(mm[2]);
+    if (n <= 1) n = n * 100; // decimal probability → percent
+    pairs.push({ label, pct: Math.max(0, Math.min(100, n)) });
+  }
+  if (pairs.length === 0) throw new Error(`Could not parse HF verdict: ${raw.slice(0, 200)}`);
+
+  // Prefer the FAKE pair if we have one; else infer from REAL.
+  const fakePair = pairs.find((p) => p.label === "FAKE");
+  const realPair = pairs.find((p) => p.label === "REAL");
+  const fakePct = fakePair ? fakePair.pct : 100 - (realPair?.pct ?? 0);
+
+  const fakeProb = fakePct / 100;
   const realProb = 1 - fakeProb;
+  const isFake = fakeProb >= 0.5;
   const trustScore = Math.round(realProb * 100);
-  const confidence = Math.round(Math.max(pct, 100 - pct));
+  const confidence = Math.round(Math.max(fakePct, 100 - fakePct));
   return {
     trust_score: trustScore,
     fake_probability: Number(fakeProb.toFixed(4)),
