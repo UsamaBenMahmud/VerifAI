@@ -69,9 +69,11 @@ function DetectPage() {
       if (res.source === "mock") toast.message("Using offline demo data — APIs unreachable");
       else if (res.source === "huggingface") toast.success("Analyzed via HuggingFace fallback");
     } catch (e: any) {
-      const msg = e?.message?.includes("Failed to fetch")
-        ? "Connection failed. Check your internet and try again."
-        : "Our servers are busy. Please try again in a moment.";
+      const msg = e?.name === "HfSleepingError" || e?.isSleeping
+        ? "🤖 Model is waking up on Hugging Face — this can take 30–60 seconds. Please try again in a moment."
+        : e?.message?.includes("Failed to fetch")
+          ? "Connection failed. Check your internet and try again."
+          : "Our servers are busy. Please try again in a moment.";
       setError(msg); toast.error(msg); setStage("idle");
     } finally {
       stepTimers.forEach(clearTimeout);
@@ -194,7 +196,7 @@ function DetectPage() {
 
       {stage === "analyzing" && (
         <div className="glass rounded-2xl p-8">
-          <h2 className="font-display text-2xl text-center">{t("VerifAI is analyzing", "VerifAI বিশ্লেষণ করছে", lang)}<span className="text-cyan animate-pulse">...</span></h2>
+          <h2 className="font-display text-2xl text-center">{t("AI is analyzing", "AI বিশ্লেষণ করছে", lang)}<span className="text-cyan animate-pulse">...</span></h2>
           <div className="mt-8 space-y-3">
             {STEPS.map((s, i) => {
               const done = step > i;
