@@ -1,6 +1,6 @@
-// POST /api/analyze-image — TruthLens BD pipeline:
-// upload to Storage → call HF deepfake model → call Lovable AI for bilingual
-// explanation → save to DB → return result.
+// POST /api/analyze-image — TruthLens BD pipeline (VIDEO):
+// upload to Storage → Gradio 4 queue flow against HF Space → parse verdict
+// string → call Lovable AI for bilingual explanation → save to DB → return.
 import { createFileRoute } from "@tanstack/react-router";
 
 const CORS = {
@@ -23,6 +23,10 @@ function normalizeHfSpaceUrl(rawUrl: string): string {
   return `https://${match[1]}-${match[2]}.hf.space`;
 }
 
+function isSleepingText(s: string): boolean {
+  return /sleep|starting|loading|building|waking/i.test(s);
+}
+
 export const Route = createFileRoute("/api/analyze-image")({
   server: {
     handlers: {
@@ -36,12 +40,12 @@ export const Route = createFileRoute("/api/analyze-image")({
           if (!HF_MODEL_URL) return json({ error: "HF_MODEL_URL not configured" }, 500);
           if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY not configured" }, 500);
 
-          // 1. Parse form
+          // 1. Parse form (video file)
           const formData = await request.formData();
           const file = formData.get("file");
           if (!(file instanceof File)) return json({ error: "No file provided" }, 400);
-          if (!file.type.startsWith("image/")) return json({ error: "Only images allowed" }, 400);
-          if (file.size > 10 * 1024 * 1024) return json({ error: "Max 10MB" }, 400);
+          if (!file.type.startsWith("video/")) return json({ error: "Only video files are supported" }, 400);
+          if (file.size > 50 * 1024 * 1024) return json({ error: "Max 50MB" }, 400);
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
           // 2. Upload to Storage
@@ -56,19 +60,19 @@ export const Route = createFileRoute("/api/analyze-image")({
             .from("uploads")
             .createSignedUrl(fileName, 86400);
           if (urlError || !urlData) throw new Error(`Signed URL failed: ${urlError?.message}`);
-          const imageUrl = urlData.signedUrl;
+          const mediaUrl = urlData.signedUrl;
 
-          // 3. Call Hugging Face model
+          // 3. Run HF Space (video deepfake detector, Gradio 4 queue flow)
           const modelResult = await callDeepfakeModel(file, buffer, normalizeHfSpaceUrl(HF_MODEL_URL));
 
           // 4. Generate bilingual explanation via Lovable AI
           const explanation = await generateBilingualExplanation(modelResult, LOVABLE_API_KEY);
 
-          // 5. Save to DB
+          // 5. Save to DB (image_url column stores any media URL; cosmetic)
           const { data: analysis, error: dbError } = await supabaseAdmin
             .from("analyses")
             .insert({
-              image_url: imageUrl,
+              image_url: mediaUrl,
               original_filename: file.name,
               file_size_bytes: file.size,
               trust_score: modelResult.trust_score,
@@ -90,6 +94,9 @@ export const Route = createFileRoute("/api/analyze-image")({
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.error("[analyze-image]", message);
+          if (message.startsWith("HF_SLEEPING:")) {
+            return json({ error: "Model is waking up, try again in ~30s" }, 503);
+          }
           return json({ error: message }, 500);
         }
       },
@@ -97,7 +104,7 @@ export const Route = createFileRoute("/api/analyze-image")({
   },
 });
 
-// ----- Hugging Face Space (Gradio) -----
+// ----- Hugging Face Space (Gradio 4 video queue flow) -----
 type ModelResult = {
   trust_score: number;
   fake_probability: number;
@@ -108,81 +115,136 @@ type ModelResult = {
   model_version: string;
 };
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
 async function callDeepfakeModel(
   file: File,
   buffer: ArrayBuffer,
   hfUrl: string,
 ): Promise<ModelResult> {
-  const base64 = bytesToBase64(new Uint8Array(buffer));
-  const dataUrl = `data:${file.type};base64,${base64}`;
+  const base = hfUrl.replace(/\/$/, "");
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 60_000);
 
-  const result = await callGradioPredict(hfUrl, dataUrl);
-  const payload = result.data?.[0];
-  if (!payload || typeof payload !== "object") {
-    throw new Error("HF model returned unexpected shape");
+  try {
+    // --- Step 1: upload the video file to Gradio's tmp storage ---
+    const uploadForm = new FormData();
+    uploadForm.append("files", new Blob([buffer], { type: file.type }), file.name);
+    const uploadRes = await fetch(`${base}/gradio_api/upload`, {
+      method: "POST",
+      body: uploadForm,
+      signal: ctrl.signal,
+    });
+    if (uploadRes.status === 503) throw new Error("HF_SLEEPING:upload 503");
+    if (!uploadRes.ok) {
+      const txt = await uploadRes.text().catch(() => "");
+      if (isSleepingText(txt)) throw new Error(`HF_SLEEPING:${txt.slice(0, 80)}`);
+      throw new Error(`HF upload failed ${uploadRes.status}: ${txt.slice(0, 200)}`);
+    }
+    const uploaded = (await uploadRes.json()) as unknown;
+    const serverPath = Array.isArray(uploaded) && typeof uploaded[0] === "string" ? uploaded[0] : null;
+    if (!serverPath) throw new Error("HF upload did not return a file path");
+
+    // --- Step 2: enqueue predict with FileData payload ---
+    const fileDataPayload = {
+      path: serverPath,
+      url: `${base}/gradio_api/file=${serverPath}`,
+      orig_name: file.name,
+      size: file.size,
+      mime_type: file.type,
+      meta: { _type: "gradio.FileData" },
+    };
+    const enqueueRes = await fetch(`${base}/gradio_api/call/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [fileDataPayload] }),
+      signal: ctrl.signal,
+    });
+    if (enqueueRes.status === 503) throw new Error("HF_SLEEPING:enqueue 503");
+    if (!enqueueRes.ok) {
+      const txt = await enqueueRes.text().catch(() => "");
+      if (isSleepingText(txt)) throw new Error(`HF_SLEEPING:${txt.slice(0, 80)}`);
+      throw new Error(`HF enqueue failed ${enqueueRes.status}: ${txt.slice(0, 200)}`);
+    }
+    const { event_id: eventId } = (await enqueueRes.json()) as { event_id?: string };
+    if (!eventId) throw new Error("HF enqueue did not return event_id");
+
+    // --- Step 3: SSE-poll for the complete event ---
+    const streamRes = await fetch(`${base}/gradio_api/call/predict/${eventId}`, {
+      method: "GET",
+      signal: ctrl.signal,
+    });
+    if (streamRes.status === 503) throw new Error("HF_SLEEPING:stream 503");
+    if (!streamRes.ok || !streamRes.body) {
+      const txt = await streamRes.text().catch(() => "");
+      if (isSleepingText(txt)) throw new Error(`HF_SLEEPING:${txt.slice(0, 80)}`);
+      throw new Error(`HF stream failed ${streamRes.status}: ${txt.slice(0, 200)}`);
+    }
+
+    const reader = streamRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let result: unknown = null;
+    let sawComplete = false;
+    while (!sawComplete) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        let eventName = "message";
+        const dataLines: string[] = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+        }
+        const dataStr = dataLines.join("\n");
+        if (eventName === "complete") {
+          try {
+            const parsed = JSON.parse(dataStr) as unknown[];
+            result = parsed?.[0];
+          } catch {
+            throw new Error(`HF complete payload not JSON: ${dataStr.slice(0, 200)}`);
+          }
+          sawComplete = true;
+          break;
+        }
+        if (eventName === "error") {
+          if (isSleepingText(dataStr)) throw new Error(`HF_SLEEPING:${dataStr.slice(0, 80)}`);
+          throw new Error(`HF returned error: ${dataStr.slice(0, 200)}`);
+        }
+      }
+    }
+    if (!sawComplete) throw new Error("HF stream ended without complete event");
+
+    return parseVerdict(result);
+  } finally {
+    clearTimeout(timeout);
   }
-  const p = payload as Partial<ModelResult>;
-  return {
-    trust_score: Number(p.trust_score ?? 0),
-    fake_probability: Number(p.fake_probability ?? 0),
-    real_probability: Number(p.real_probability ?? 0),
-    verdict: String(p.verdict ?? ""),
-    verdict_bn: String(p.verdict_bn ?? ""),
-    confidence: Number(p.confidence ?? 0),
-    model_version: String(p.model_version ?? "unknown"),
-  };
 }
 
-async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data?: unknown[] }> {
-  const body = JSON.stringify({ data: [dataUrl] });
-  const endpointBase = hfUrl.replace(/\/$/, "");
-
-  // Gradio 4+ queue flow: enqueue, then SSE-poll for result.
-  const queued = await fetch(`${endpointBase}/gradio_api/call/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
-  if (!queued.ok) {
-    const txt = await queued.text().catch(() => "");
-    throw new Error(`HF model error ${queued.status}: ${txt.slice(0, 200)}`);
-  }
-  const { event_id } = (await queued.json()) as { event_id?: string };
-  if (!event_id) throw new Error("HF model did not return a queue event ID");
-
-  const stream = await fetch(`${endpointBase}/gradio_api/call/predict/${event_id}`);
-  if (!stream.ok) {
-    const txt = await stream.text().catch(() => "");
-    throw new Error(`HF model queue error ${stream.status}: ${txt.slice(0, 200)}`);
-  }
-  const text = await stream.text();
-  // Parse SSE frames; find the `complete` event.
-  const frames = text.split("\n\n");
-  for (const frame of frames) {
-    let eventName = "message";
-    const dataLines: string[] = [];
-    for (const line of frame.split("\n")) {
-      if (line.startsWith("event:")) eventName = line.slice(6).trim();
-      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-    }
-    if (eventName === "complete") {
-      const parsed = JSON.parse(dataLines.join("\n")) as unknown[];
-      return { data: parsed };
-    }
-    if (eventName === "error") {
-      throw new Error(`HF model returned error: ${dataLines.join("\n").slice(0, 200)}`);
-    }
-  }
-  throw new Error(`HF model queue failed: ${text.slice(0, 200)}`);
+// HF Space returns a single string like "FAKE (87.2%) ⚠️" or "REAL (92.1%) ✅"
+// or "❌ Video read failed". Parse into a structured ModelResult.
+function parseVerdict(payload: unknown): ModelResult {
+  const raw = typeof payload === "string" ? payload : JSON.stringify(payload ?? "");
+  const m = raw.match(/(REAL|FAKE)[^\d]*?(\d+(?:\.\d+)?)/i);
+  if (!m) throw new Error(`Could not parse HF verdict: ${raw.slice(0, 200)}`);
+  const label = m[1].toUpperCase();
+  const pct = Math.max(0, Math.min(100, parseFloat(m[2])));
+  const isFake = label === "FAKE";
+  const fakeProb = isFake ? pct / 100 : 1 - pct / 100;
+  const realProb = 1 - fakeProb;
+  const trustScore = Math.round(realProb * 100);
+  const confidence = Math.round(Math.max(pct, 100 - pct));
+  return {
+    trust_score: trustScore,
+    fake_probability: Number(fakeProb.toFixed(4)),
+    real_probability: Number(realProb.toFixed(4)),
+    verdict: isFake ? "Likely Deepfake" : "Likely Authentic",
+    verdict_bn: isFake ? "সম্ভবত ডিপফেক" : "সম্ভবত আসল",
+    confidence,
+    model_version: "efficientnet-b2-6ch-v1",
+  };
 }
 
 // ----- Lovable AI Gateway (Gemini) for bilingual explanation -----

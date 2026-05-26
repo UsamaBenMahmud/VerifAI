@@ -1,29 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Upload, Camera, Link as LinkIcon, FileText, Share2, Flag, Code2, ChevronDown, Clipboard, Beaker, Download, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
-import { CameraModal } from "@/components/detect/CameraModal";
-import { analyze, bandFor, fileToBase64, extractVideoFrame, isValidUrl, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { analyze, bandFor, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 
 export const Route = createFileRoute("/detect")({
   head: () => ({ meta: [
     { title: "Detect — VerifAI" },
-    { name: "description", content: "Upload a video, image, or URL and get a deepfake trust score in 6 seconds." },
-    { property: "og:title", content: "VerifAI — Analyze Content" },
+    { name: "description", content: "Upload a video and get a deepfake trust score in seconds." },
+    { property: "og:title", content: "VerifAI — Analyze Video" },
     { property: "og:description", content: "Multi-agent deepfake analysis with Bangla + English reasoning." },
   ]}),
   component: DetectPage,
 });
 
 type Stage = "idle" | "analyzing" | "results";
-type Tab = "file" | "url" | "camera";
 
 const STEPS = [
-  { en: "📤 Uploading media...", bn: "📤 মিডিয়া আপলোড হচ্ছে...", pct: 15 },
-  { en: "🔬 Vision Agent — Scanning facial regions...", bn: "🔬 ভিশন এজেন্ট — মুখমণ্ডল স্ক্যান হচ্ছে...", pct: 35 },
-  { en: "📋 Metadata Agent — Checking EXIF & watermarks...", bn: "📋 মেটাডেটা এজেন্ট — EXIF ও ওয়াটারমার্ক যাচাই...", pct: 55 },
-  { en: "🕸️ Context Agent — Searching knowledge graph...", bn: "🕸️ কনটেক্সট এজেন্ট — জ্ঞান-গ্রাফ অনুসন্ধান...", pct: 80 },
+  { en: "📤 Uploading video...", bn: "📤 ভিডিও আপলোড হচ্ছে...", pct: 15 },
+  { en: "🔬 Vision Agent — Extracting frames...", bn: "🔬 ভিশন এজেন্ট — ফ্রেম এক্সট্রাকশন...", pct: 35 },
+  { en: "🧠 Model Agent — Running EfficientNet-B2 (6-ch)...", bn: "🧠 মডেল এজেন্ট — EfficientNet-B2 চলছে...", pct: 60 },
+  { en: "🕸️ Knowledge Agent — Cross-checking patterns...", bn: "🕸️ জ্ঞান এজেন্ট — প্যাটার্ন যাচাই...", pct: 80 },
   { en: "🤖 Reasoning Agent — Generating explanation...", bn: "🤖 যুক্তি এজেন্ট — ব্যাখ্যা তৈরি হচ্ছে...", pct: 95 },
   { en: "✅ Analysis complete", bn: "✅ বিশ্লেষণ সম্পন্ন", pct: 100 },
 ];
@@ -31,13 +29,10 @@ const STEPS = [
 function DetectPage() {
   const { lang } = useLang();
   const [stage, setStage] = useState<Stage>("idle");
-  const [tab, setTab] = useState<Tab>("file");
   const [step, setStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
   const [fileMeta, setFileMeta] = useState<{ name: string; size: number; type: string } | null>(null);
-  const [urlInput, setUrlInput] = useState("");
-  const [showCamera, setShowCamera] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [showAbout, setShowAbout] = useState(false);
@@ -46,7 +41,8 @@ function DetectPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const reset = () => {
-    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setUrlInput(""); setError(null); setResult(null); setShowCompare(false);
+    if (preview) URL.revokeObjectURL(preview);
+    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setError(null); setResult(null); setShowCompare(false);
   };
 
   const startAnalysis = async (input: AnalyzeInput) => {
@@ -54,26 +50,22 @@ function DetectPage() {
     const t0 = Date.now();
     const ti = setInterval(() => setElapsed((Date.now() - t0) / 1000), 100);
     const stepTimers: ReturnType<typeof setTimeout>[] = [];
-    [600, 1300, 2000, 2700, 3400].forEach((ms, i) => {
+    [600, 1500, 3000, 5000, 7000].forEach((ms, i) => {
       stepTimers.push(setTimeout(() => setStep(i + 1), ms));
     });
     try {
-      const [res] = await Promise.all([
-        analyze(input),
-        new Promise(r => setTimeout(r, 3800)),
-      ]);
+      const res = await analyze(input);
       setStep(5);
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 300));
       setResult(res);
       setStage("results");
-      if (res.source === "mock") toast.message("Using offline demo data — APIs unreachable");
-      else if (res.source === "huggingface") toast.success("Analyzed via HuggingFace fallback");
+      toast.success("Analysis complete");
     } catch (e: any) {
       const msg = e?.name === "HfSleepingError" || e?.isSleeping
         ? "🤖 Model is waking up on Hugging Face — this can take 30–60 seconds. Please try again in a moment."
         : e?.message?.includes("Failed to fetch")
           ? "Connection failed. Check your internet and try again."
-          : "Our servers are busy. Please try again in a moment.";
+          : e?.message || "Analysis failed. Please try again.";
       setError(msg); toast.error(msg); setStage("idle");
     } finally {
       stepTimers.forEach(clearTimeout);
@@ -84,92 +76,35 @@ function DetectPage() {
   const handleFile = async (f: File) => {
     setError(null);
     if (f.size > MAX_BYTES) { const m = "File too large. Max 50MB."; setError(m); toast.error(m); return; }
-    const ok = ACCEPT.split(",").includes(f.type);
-    if (!ok) { const m = "This format isn't supported. Try MP4, JPG, or PNG."; setError(m); toast.error(m); return; }
+    if (!f.type.startsWith("video/")) { const m = "Only video files are supported (MP4, MOV, WebM)."; setError(m); toast.error(m); return; }
+    if (preview) URL.revokeObjectURL(preview);
     setFileMeta({ name: f.name, size: f.size, type: f.type });
-    try {
-      const b64 = f.type.startsWith("video/") ? await extractVideoFrame(f) : await fileToBase64(f);
-      setPreview(b64);
-      await startAnalysis({ kind: "image", base64: b64, mime: "image/jpeg" });
-    } catch {
-      const m = "Could not read media file."; setError(m); toast.error(m);
-    }
-  };
-
-  const handleUrlSubmit = async () => {
-    if (!isValidUrl(urlInput)) { const m = "Please enter a valid URL starting with https://"; setError(m); toast.error(m); return; }
-    setPreview(null); setFileMeta(null);
-    await startAnalysis({ kind: "url", url: urlInput.trim() });
-  };
-
-  const handleCameraCapture = async (b64: string) => {
-    setShowCamera(false); setPreview(b64); setFileMeta({ name: "camera-capture.jpg", size: Math.round(b64.length * 0.75), type: "image/jpeg" });
-    await startAnalysis({ kind: "image", base64: b64, mime: "image/jpeg" });
+    setPreview(URL.createObjectURL(f));
+    await startAnalysis({ kind: "video", file: f });
   };
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold">{t("Analyze Content", "কনটেন্ট বিশ্লেষণ", lang)}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("Upload media to run the 6-step verification pipeline.", "৬-ধাপ যাচাই পাইপলাইন চালাতে মিডিয়া আপলোড করুন।", lang)}</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold">{t("Analyze Video", "ভিডিও বিশ্লেষণ", lang)}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Upload a video to run the deepfake detection pipeline.", "ডিপফেক যাচাই পাইপলাইন চালাতে ভিডিও আপলোড করুন।", lang)}</p>
         </div>
       </div>
 
       {stage === "idle" && (
         <div className="glass rounded-2xl p-6 sm:p-8">
-          {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-[color:var(--border)]">
-            {([
-              { k: "file", icon: Upload, en: "Upload File", bn: "ফাইল আপলোড" },
-              { k: "url", icon: LinkIcon, en: "Paste URL", bn: "URL দিন" },
-              { k: "camera", icon: Camera, en: "Use Camera", bn: "ক্যামেরা" },
-            ] as const).map(({ k, icon: Icon, en, bn }) => (
-              <button key={k} onClick={() => setTab(k)} className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${tab === k ? "border-cyan text-cyan" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                <Icon className="h-4 w-4" /> {t(en, bn, lang)}
-              </button>
-            ))}
+          <div
+            onClick={() => fileInput.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+            className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
+          >
+            <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
+            <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 50MB</p>
+            <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
           </div>
-
-          {tab === "file" && (
-            <div
-              onClick={() => fileInput.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
-              className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
-            >
-              <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
-              <p className="font-display text-xl">{t("Drop video or image here", "ভিডিও বা ছবি এখানে রাখুন", lang)}</p>
-              <p className="mt-2 text-sm text-muted-foreground">MP4 · AVI · MOV · JPG · PNG · WEBP · max 50MB</p>
-              <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-            </div>
-          )}
-
-          {tab === "url" && (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://example.com/suspicious-video.mp4"
-                  className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--bg-surface)] px-4 py-3 text-sm font-mono"
-                />
-                <button onClick={async () => { try { const v = await navigator.clipboard.readText(); setUrlInput(v); } catch { toast.error("Clipboard blocked"); } }} className="inline-flex items-center gap-2 rounded-md border border-cyan/40 px-3 py-2 text-sm hover:bg-cyan/10"><Clipboard className="h-4 w-4" /> {t("Paste", "পেস্ট", lang)}</button>
-                <button onClick={handleUrlSubmit} className="rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-semibold glow-cyan">{t("Analyze", "বিশ্লেষণ", lang)}</button>
-              </div>
-              <p className="text-xs text-muted-foreground">{t("Paste a link to a video, image, or social media post.", "ভিডিও, ছবি বা পোস্টের লিঙ্ক পেস্ট করুন।", lang)}</p>
-            </div>
-          )}
-
-          {tab === "camera" && (
-            <div className="text-center py-10">
-              <Camera className="h-12 w-12 text-cyan mx-auto mb-4" />
-              <p className="font-display text-xl mb-2">{t("Capture from your webcam", "ওয়েবক্যাম থেকে ছবি নিন", lang)}</p>
-              <p className="text-sm text-muted-foreground mb-6">{t("Test VerifAI on your own face — instant feedback.", "নিজের মুখে VerifAI পরীক্ষা করুন।", lang)}</p>
-              <button onClick={() => setShowCamera(true)} className="inline-flex items-center gap-2 rounded-md bg-cyan text-[color:var(--bg-deep)] px-5 py-3 text-sm font-semibold glow-cyan"><Camera className="h-4 w-4" /> {t("Open Camera", "ক্যামেরা খুলুন", lang)}</button>
-            </div>
-          )}
 
           {error && (
             <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger flex items-center gap-2">
@@ -179,7 +114,7 @@ function DetectPage() {
 
           {fileMeta && (
             <div className="mt-4 flex items-center gap-3 rounded-md border border-cyan/30 bg-cyan/5 p-3">
-              {preview && (preview.startsWith("data:image") || preview.startsWith("data:application")) && <img src={preview} alt="" className="h-12 w-12 rounded object-cover" />}
+              {preview && <video src={preview} className="h-12 w-20 rounded object-cover bg-black" muted />}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{fileMeta.name}</div>
                 <div className="text-xs text-muted-foreground">{(fileMeta.size / 1024 / 1024).toFixed(2)} MB</div>
@@ -191,8 +126,6 @@ function DetectPage() {
           <p className="mt-4 text-xs text-muted-foreground text-center">🔒 {t("Your upload is encrypted and auto-deleted in 24 hours.", "আপনার আপলোড এনক্রিপ্টেড এবং ২৪ ঘণ্টায় স্বয়ংক্রিয়ভাবে মুছে যাবে।", lang)}</p>
         </div>
       )}
-
-      {showCamera && <CameraModal onClose={() => setShowCamera(false)} onCapture={handleCameraCapture} />}
 
       {stage === "analyzing" && (
         <div className="glass rounded-2xl p-8">
@@ -254,7 +187,7 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
           <div className="text-xs uppercase tracking-widest font-mono" style={{ color: band.color }}>{t(band.en, band.bn, lang)}</div>
           <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold">{t(band.en.replace(/^[^A-Za-z]+/, ""), band.bn.replace(/^[^\u0980-\u09FF]+/, ""), lang)}</h2>
           <p className="mt-3 text-sm text-muted-foreground font-mono">{t("Confidence", "আত্মবিশ্বাস", lang)}: {result.confidence.toFixed(1)}% ± {result.confidenceMargin.toFixed(1)}%</p>
-          {preview && <img src={preview} alt="analyzed" className="mt-4 max-h-32 rounded-md border border-[color:var(--border)]" />}
+          {preview && <video src={preview} controls className="mt-4 max-h-40 rounded-md border border-[color:var(--border)] bg-black" />}
           <p className="mt-3 text-xs text-muted-foreground">{t("Analyzed via", "বিশ্লেষণ", lang)}: <span className="font-mono text-cyan">{result.source}</span></p>
         </div>
       </div>
