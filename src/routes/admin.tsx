@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings, Link2 } from "lucide-react";
+import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings, Link2, Presentation as PresentationIcon, Upload, Trash2, FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminAnalyses, hourly, agentPerf } from "@/lib/mockData";
@@ -22,6 +23,7 @@ const sideLinks = [
   { id: "agents", label: "Agent Performance", icon: Bot },
   { id: "cost", label: "Cost & Usage", icon: DollarSign },
   { id: "flagged", label: "Flagged Reports", icon: Flag },
+  { id: "presentation", label: "Presentation", icon: PresentationIcon },
   { id: "links", label: "Submission Links", icon: Link2 },
   { id: "apikeys", label: "API Keys", icon: Key },
   { id: "settings", label: "Settings", icon: Settings },
@@ -50,6 +52,7 @@ function AdminPage() {
         {tab === "agents" && <AgentsTab />}
         {tab === "cost" && <CostTab />}
         {tab === "flagged" && <FlaggedTab />}
+        {tab === "presentation" && <PresentationTab />}
         {tab === "links" && <LinksTab />}
         {tab === "apikeys" && <ApiKeysTab />}
         {tab === "settings" && <SettingsTab />}
@@ -476,6 +479,89 @@ function SettingsTab() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PresentationTab() {
+  const [busy, setBusy] = useState(false);
+  const [current, setCurrent] = useState<{ id: string; title: string; original_filename: string | null; file_size_bytes: number | null; url: string | null } | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase
+      .from("presentations")
+      .select("id,title,original_filename,file_size_bytes,slide_image_urls")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) { setCurrent(null); return; }
+    const path = data.slide_image_urls?.[0];
+    const url = path ? supabase.storage.from("uploads").getPublicUrl(path).data.publicUrl : null;
+    setCurrent({ id: data.id, title: data.title, original_filename: data.original_filename, file_size_bytes: data.file_size_bytes, url });
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const onUpload = async (f: File) => {
+    if (f.size > 25 * 1024 * 1024) return toast.error("File too large (max 25MB)");
+    setBusy(true);
+    const ext = f.name.split(".").pop() || "pptx";
+    const path = `presentations/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("uploads").upload(path, f, { contentType: f.type, upsert: false });
+    if (upErr) { setBusy(false); return toast.error(upErr.message); }
+    const { data: userData } = await supabase.auth.getUser();
+    await supabase.from("presentations").update({ is_active: false }).eq("is_active", true);
+    const { error: insErr } = await supabase.from("presentations").insert({
+      title: f.name.replace(/\.[^.]+$/, ""),
+      original_filename: f.name,
+      file_size_bytes: f.size,
+      slide_image_urls: [path],
+      uploaded_by: userData.user?.id ?? null,
+      is_active: true,
+    });
+    setBusy(false);
+    if (insErr) return toast.error(insErr.message);
+    toast.success("Presentation published to Docs");
+    load();
+  };
+
+  const onDelete = async () => {
+    if (!current) return;
+    setBusy(true);
+    await supabase.from("presentations").update({ is_active: false }).eq("id", current.id);
+    setBusy(false);
+    toast.success("Removed from Docs");
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-display text-2xl font-bold">Presentation</h2>
+        <p className="text-sm text-muted-foreground">Upload the slide deck (PPTX or PDF). It appears live on the <Link to="/docs" className="text-cyan hover:underline">Docs → Presentation</Link> tab for all visitors.</p>
+      </div>
+
+      {current && (
+        <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
+          <FileText className="h-6 w-6 text-cyan" />
+          <div className="flex-1 min-w-0">
+            <div className="font-display truncate">{current.original_filename || current.title}</div>
+            <div className="text-xs text-muted-foreground">{current.file_size_bytes ? (current.file_size_bytes / 1024 / 1024).toFixed(2) + " MB" : ""} · Active</div>
+          </div>
+          {current.url && <a href={current.url} download className="text-xs text-cyan hover:underline">Download</a>}
+          <button onClick={onDelete} disabled={busy} className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"><Trash2 className="h-3 w-3" /> Remove</button>
+        </div>
+      )}
+
+      <label className="block border-2 border-dashed border-cyan/40 rounded-xl p-8 text-center cursor-pointer hover:bg-cyan/5">
+        <Upload className="h-6 w-6 text-cyan mx-auto" />
+        <div className="mt-2 font-display font-semibold">{busy ? "Uploading…" : "Upload PPTX / PDF"}</div>
+        <div className="text-xs text-muted-foreground">Max 25MB · Replaces the current active deck</div>
+        <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          className="hidden" disabled={busy}
+          onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+      </label>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserMenu } from "@/components/nav/UserMenu";
 import { AdminSessionTimer } from "@/components/nav/AdminSessionTimer";
 
-const links = [
+const baseLinks = [
   { to: "/", label: "Home" },
   { to: "/detect", label: "Detect" },
   { to: "/dashboard", label: "Dashboard" },
@@ -15,8 +15,8 @@ const links = [
   { to: "/help", label: "Help" },
   { to: "/docs", label: "Docs" },
   { to: "/scoring", label: "Scoring" },
-  { to: "/admin", label: "Admin" },
 ] as const;
+const adminLink = { to: "/admin", label: "Admin" } as const;
 
 export function Navbar() {
   const { lang, toggle } = useLang();
@@ -49,7 +49,7 @@ export function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="shrink-0"><Logo /></Link>
         <ul className="hidden lg:flex items-center gap-1">
-          {links.map((l) => {
+          {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
             return (
               <li key={l.to}>
@@ -91,7 +91,7 @@ export function Navbar() {
       {open && (
         <div className="lg:hidden border-t border-[color:var(--border)] glass-strong">
           <ul className="px-4 py-3 space-y-1">
-            {links.map((l) => (
+            {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
               <li key={l.to}>
                 <Link to={l.to} onClick={() => setOpen(false)} className="block px-3 py-2 rounded-md hover:bg-cyan/10 text-sm">{l.label}</Link>
               </li>
