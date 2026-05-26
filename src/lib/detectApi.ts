@@ -3,7 +3,7 @@
 // the result to the database. No browser-side HF call (videos are too large
 // to base64) and no mock fallback — real errors surface to the UI.
 
-export type Severity = "HIGH" | "MED" | "LOW";
+export type Severity = "HIGH" | "MED" | "LOW" | "SAFE";
 
 export type AnalysisResult = {
   score: number; // 0-100, higher = more authentic
@@ -42,8 +42,6 @@ export class HfSleepingError extends Error {
     this.name = "HfSleepingError";
   }
 }
-
-const SUB_FILLER = { metadata: 88, knowledge: 72, audio: 80 };
 
 function severityFor(score: number): Severity {
   return score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW";
