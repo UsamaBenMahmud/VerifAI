@@ -125,25 +125,7 @@ async function callDeepfakeModel(
   const base64 = bytesToBase64(new Uint8Array(buffer));
   const dataUrl = `data:${file.type};base64,${base64}`;
 
-  const body = JSON.stringify({ data: [dataUrl] });
-  const endpointBase = hfUrl.replace(/\/$/, "");
-  let res = await fetch(`${endpointBase}/run/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
-  if (res.status === 404) {
-    res = await fetch(`${endpointBase}/api/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-  }
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`HF model error ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  const result = (await res.json()) as { data?: unknown[] };
+  const result = await callGradioPredict(hfUrl, dataUrl);
   const payload = result.data?.[0];
   if (!payload || typeof payload !== "object") {
     throw new Error("HF model returned unexpected shape");
@@ -158,6 +140,45 @@ async function callDeepfakeModel(
     confidence: Number(p.confidence ?? 0),
     model_version: String(p.model_version ?? "unknown"),
   };
+}
+
+async function callGradioPredict(hfUrl: string, dataUrl: string): Promise<{ data?: unknown[] }> {
+  const body = JSON.stringify({ data: [dataUrl] });
+  const endpointBase = hfUrl.replace(/\/$/, "");
+  const directPaths = ["/run/predict", "/api/predict", "/gradio_api/run/predict", "/gradio_api/api/predict"];
+  let lastError = "";
+
+  for (const path of directPaths) {
+    const res = await fetch(`${endpointBase}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (res.ok) return (await res.json()) as { data?: unknown[] };
+    lastError = `HF model error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`;
+  }
+
+  const queued = await fetch(`${endpointBase}/gradio_api/call/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (!queued.ok) {
+    const txt = await queued.text().catch(() => "");
+    throw new Error(`HF model error ${queued.status}: ${txt.slice(0, 200) || lastError}`);
+  }
+  const { event_id } = (await queued.json()) as { event_id?: string };
+  if (!event_id) throw new Error("HF model did not return a queue event ID");
+
+  const stream = await fetch(`${endpointBase}/gradio_api/call/predict/${event_id}`);
+  if (!stream.ok) {
+    const txt = await stream.text().catch(() => "");
+    throw new Error(`HF model queue error ${stream.status}: ${txt.slice(0, 200)}`);
+  }
+  const text = await stream.text();
+  const complete = text.match(/event:\s*complete\s*\ndata:\s*(.+)/);
+  if (!complete) throw new Error(`HF model queue failed: ${text.slice(0, 200)}`);
+  return JSON.parse(complete[1]) as { data?: unknown[] };
 }
 
 // ----- Lovable AI Gateway (Gemini) for bilingual explanation -----
