@@ -149,8 +149,53 @@ async function tryHF(input: AnalyzeInput, signal: AbortSignal): Promise<Analysis
   }
 }
 
+async function tryServer(input: AnalyzeInput, signal: AbortSignal): Promise<AnalysisResult | null> {
+  if (input.kind !== "image") return null;
+  try {
+    // base64 data URL -> Blob
+    const b64 = stripBase64Prefix(input.base64);
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: input.mime });
+    const fd = new FormData();
+    fd.append("file", blob, `upload.${input.mime.split("/")[1] || "jpg"}`);
+    const res = await fetch("/api/analyze-image", { method: "POST", body: fd, signal });
+    if (!res.ok) return null;
+    const d = await res.json();
+    if (typeof d?.trust_score !== "number") return null;
+    const score = d.trust_score;
+    const conf = Number(d.confidence ?? 0);
+    return {
+      ...MOCK,
+      score,
+      confidence: conf,
+      subScores: {
+        vision: Math.round((d.fake_probability ?? 0) * 100),
+        metadata: MOCK.subScores.metadata,
+        knowledge: MOCK.subScores.knowledge,
+        audio: MOCK.subScores.audio,
+      },
+      riskFactors: [
+        {
+          severity: score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW",
+          titleEn: d.verdict ?? "Analysis complete",
+          titleBn: d.verdict_bn ?? "বিশ্লেষণ সম্পন্ন",
+          detailEn: d.explanation_en ?? "",
+          detailBn: d.explanation_bn ?? "",
+        },
+      ],
+      source: "primary",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
   const ctrl = signal ?? new AbortController().signal;
+  const server = await tryServer(input, ctrl);
+  if (server) return server;
   const primary = await tryPrimary(input, ctrl);
   if (primary) return primary;
   const hf = await tryHF(input, ctrl);
