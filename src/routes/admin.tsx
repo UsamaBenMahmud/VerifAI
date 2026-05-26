@@ -52,6 +52,7 @@ function AdminPage() {
         {tab === "agents" && <AgentsTab />}
         {tab === "cost" && <CostTab />}
         {tab === "flagged" && <FlaggedTab />}
+        {tab === "presentation" && <PresentationTab />}
         {tab === "links" && <LinksTab />}
         {tab === "apikeys" && <ApiKeysTab />}
         {tab === "settings" && <SettingsTab />}
