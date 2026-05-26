@@ -23,6 +23,7 @@ const sideLinks = [
   { id: "agents", label: "Agent Performance", icon: Bot },
   { id: "cost", label: "Cost & Usage", icon: DollarSign },
   { id: "flagged", label: "Flagged Reports", icon: Flag },
+  { id: "presentation", label: "Presentation", icon: PresentationIcon },
   { id: "links", label: "Submission Links", icon: Link2 },
   { id: "apikeys", label: "API Keys", icon: Key },
   { id: "settings", label: "Settings", icon: Settings },
