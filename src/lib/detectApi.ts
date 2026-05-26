@@ -216,8 +216,82 @@ async function prepareImageForUpload(base64: string, mime: string): Promise<{ ba
   return { base64: canvas.toDataURL("image/jpeg", 0.82), mime: "image/jpeg" };
 }
 
+export class HfSleepingError extends Error {
+  isSleeping = true as const;
+  constructor(msg = "Hugging Face Space is waking up") {
+    super(msg);
+    this.name = "HfSleepingError";
+  }
+}
+
+const HF_SPACE = "https://aahsann-deepfake-detector.hf.space";
+const HF_PATHS = ["/run/predict", "/api/predict", "/gradio_api/run/predict"];
+
+async function tryHfSpace(input: AnalyzeInput, signal: AbortSignal): Promise<AnalysisResult | null> {
+  if (input.kind !== "image") return null;
+  const base64String = stripBase64Prefix(input.base64);
+  const body = JSON.stringify({ data: [base64String] });
+  let lastText = "";
+  for (const path of HF_PATHS) {
+    let res: Response;
+    try {
+      res = await fetch(`${HF_SPACE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal,
+      });
+    } catch {
+      continue;
+    }
+    if (res.ok) {
+      const json = (await res.json()) as { data?: unknown[] };
+      const payload = json?.data?.[0];
+      let trustScore: number | undefined;
+      let verdict = "";
+      let verdictBn = "";
+      let confidence = 0;
+      if (payload && typeof payload === "object") {
+        const p = payload as Record<string, unknown>;
+        trustScore = typeof p.trust_score === "number" ? p.trust_score : undefined;
+        verdict = String(p.verdict ?? (p as { label?: unknown }).label ?? "");
+        verdictBn = String(p.verdict_bn ?? "");
+        confidence = Number(p.confidence ?? 0);
+      } else if (typeof payload === "string") {
+        verdict = payload;
+      } else {
+        return null;
+      }
+      const score = typeof trustScore === "number" ? Math.round(trustScore) : 50;
+      return {
+        ...MOCK,
+        score,
+        confidence: confidence || 90,
+        subScores: { ...MOCK.subScores, vision: 100 - score },
+        riskFactors: [
+          {
+            severity: score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW",
+            titleEn: verdict || "Analysis complete",
+            titleBn: verdictBn || verdict || "বিশ্লেষণ সম্পন্ন",
+            detailEn: `Trust Score: ${score}/100`,
+            detailBn: `ট্রাস্ট স্কোর: ${score}/১০০`,
+          },
+        ],
+        source: "huggingface",
+      };
+    }
+    if (res.status === 503) throw new HfSleepingError();
+    lastText = await res.text().catch(() => "");
+    if (/sleep|starting|loading|building/i.test(lastText)) throw new HfSleepingError();
+    if (res.status !== 404 && res.status !== 405) break;
+  }
+  return null;
+}
+
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
   const ctrl = signal ?? new AbortController().signal;
+  const hfSpace = await tryHfSpace(input, ctrl);
+  if (hfSpace) return hfSpace;
   const server = await tryServer(input, ctrl);
   if (server) return server;
   const primary = await tryPrimary(input, ctrl);

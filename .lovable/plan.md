@@ -1,60 +1,31 @@
-# VerifAI Backend — Adapted to Lovable Cloud + TanStack Start
+## Goal
+Wire the upload button on `/detect` to call your Hugging Face Space directly from the browser at `https://aahsann-deepfake-detector.hf.space`, parse Trust Score and Verdict from `data[0]`, and surface a friendly "model is waking up" message when the Space is sleeping.
 
-Your project runs on **Lovable Cloud (managed Supabase)** and **TanStack Start**, not raw Supabase CLI + Deno Edge Functions. I'll deliver the same end-to-end pipeline — Storage upload → HF model → LLM Bangla explanation → DB save — but adapted to this stack. No `.env.local`, no `supabase init`, no `supabase functions deploy` needed.
+## Changes
 
-## What changes vs. your guide
+### 1. `src/lib/detectApi.ts` — add a direct HF Space client
+Add a new function `tryHfSpace(input)` that:
+- Only runs for `kind: "image"`.
+- Strips the `data:image/...;base64,` prefix from the base64 string.
+- POSTs to `https://aahsann-deepfake-detector.hf.space/run/predict` with body `{ "data": [base64String] }` and `Content-Type: application/json`. If that returns 404, retry against `/api/predict` and `/gradio_api/run/predict` (different Gradio versions expose different paths).
+- On HTTP 503, or a response body containing "sleeping" / "is starting" / "loading", throw a typed `HfSleepingError` so the UI can show the wake-up message.
+- On success, read `json.data[0]` (Gradio always wraps outputs in a `data` array). The Space may return either a JSON object (`{ trust_score, verdict, ... }`) or a plain string — handle both:
+  - object → use `trust_score` and `verdict` directly.
+  - string → put the whole string in `verdict`, leave `trust_score` undefined and derive a neutral score.
+- Map into the existing `AnalysisResult` shape (`score`, `confidence`, `riskFactors[0].titleEn = verdict`) with `source: "huggingface"` so the existing results UI keeps working.
 
+Update `analyze()` to try `tryHfSpace` FIRST (before the current server / primary / HF inference fallbacks), and let `HfSleepingError` bubble up instead of being swallowed.
 
-| Your guide                           | Lovable Cloud equivalent                                                                                                                    |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env.local` with keys               | Secrets via `add_secret` tool (HF_MODEL_URL, ANTHROPIC_API_KEY)                                                                             |
-| SQL Editor → run schema              | `supabase--migration` tool (auto-applied)                                                                                                   |
-| Create `uploads` bucket in dashboard | Migration creates bucket + RLS policies                                                                                                     |
-| Deno Edge Function `analyze-image`   | TanStack server route `/api/analyze-image` (`createFileRoute`)                                                                              |
-| `supabase functions deploy`          | Auto-deployed with the app                                                                                                                  |
-| `Deno.env.get(...)`                  | `process.env.*` inside the route handler                                                                                                    |
-| Claude API direct                    | **Option A**: Lovable AI Gateway (Gemini/GPT, no key needed) — recommended. **Option B**: Anthropic Claude (you supply `ANTHROPIC_API_KEY`) |
+### 2. `src/routes/detect.tsx` — sleeping-space UX + clearer spinner
+- In `startAnalysis`'s `catch`, detect `HfSleepingError` (by `name` or a flag) and set a dedicated message: "🤖 Model is waking up on Hugging Face — this can take 30–60 seconds. Please try again in a moment." (with Bangla equivalent). Keep current generic message for other errors.
+- Replace the analyzing-stage heading with the requested copy: **"AI is analyzing…"** / **"AI বিশ্লেষণ করছে…"**, keeping the existing animated step list and progress bar underneath.
+- After results render, the existing Results header already shows the Trust Score gauge and the verdict band — confirm `riskFactors[0].titleEn` (the HF verdict) is visible at the top of the Evidence panel; no structural change needed.
 
+### 3. Leave untouched
+- `src/routes/api/analyze-image.ts` (server pipeline) stays in place as a fallback path but is no longer the primary call.
+- Video handling still extracts a frame client-side via `extractVideoFrame` and sends it as an image — HF Space only accepts images.
 
-## Database schema (migration)
-
-Creates `analyses` table with all your columns, indexes, RLS:
-
-- `INSERT` allowed for everyone (anonymous uploads)
-- `SELECT` only own rows OR anonymous rows (`user_id IS NULL`)
-- `public_analyses` view (last 30 days, no PII) granted to `anon`/`authenticated`
-- `uploads` storage bucket (private) + policies for public insert and signed-URL reads
-
-## Backend endpoint
-
-`**src/routes/api/analyze-image.ts**` — TanStack server route, POST multipart/form-data:
-
-1. Validate file (image/*, ≤10MB)
-2. Upload to `uploads` bucket via `supabaseAdmin`
-3. Create 24h signed URL
-4. Call HF Gradio endpoint (`${HF_MODEL_URL}/run/predict`) with base64 data URL
-5. Call LLM for bilingual explanation → `{ en, bn }`
-6. Insert row into `analyses`, return the saved record
-7. Returns JSON; CORS headers included
-
-Path `/api/analyze-image` (NOT under `/api/public/` since this is called by your own frontend on the same origin).
-
-## Secrets needed
-
-- `HF_MODEL_URL` — your HF Space URL (required)
-- `ANTHROPIC_API_KEY` — only if you pick Option B
-
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are already provisioned.
-
-## Frontend wiring
-
-Your existing `/detect` page calls `fetch('/api/analyze-image', { method: 'POST', body: formData })`. I'll update `src/lib/detectApi.ts` to hit this endpoint and shape the response for the existing UI (no UI redesign).
-
-## One decision needed from you
-
-**Which LLM for Bangla explanations?**
-
-- **A) Lovable AI Gateway (Gemini 2.5 Flash)** — free during promo, no API key, faster setup. Recommended.
-- **B) Anthropic Claude 3.5 Sonnet** — matches your guide exactly, requires you to paste `ANTHROPIC_API_KEY`.
-
-Reply with **A** or **B** (and confirm your HF Space URL) and I'll switch to build mode and ship it.
+## Technical notes
+- Direct browser → HF call means no CORS proxy on our side; HF Spaces send permissive CORS headers, so this works from the browser.
+- We keep the existing client-side base64 conversion (`fileToBase64`) — it already runs only in browser event handlers, so SSR is safe.
+- No new dependencies, no schema changes, no secrets needed (HF Space is public).
