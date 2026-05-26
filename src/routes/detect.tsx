@@ -319,6 +319,7 @@ function EvidenceCard({ severity, title, detail }: { severity: Severity; title: 
     HIGH: { border: "border-danger", bg: "bg-danger/5", badge: "bg-danger/20 text-danger" },
     MED: { border: "border-warning", bg: "bg-warning/5", badge: "bg-warning/20 text-warning" },
     LOW: { border: "border-safe", bg: "bg-safe/5", badge: "bg-safe/20 text-safe" },
+    SAFE: { border: "border-safe", bg: "bg-safe/5", badge: "bg-safe/20 text-safe" },
   };
   const s = styles[severity];
   return (
