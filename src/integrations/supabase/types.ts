@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      analyses: {
+        Row: {
+          analysis_time_ms: number | null
+          confidence: number | null
+          created_at: string
+          expires_at: string
+          explanation_bn: string | null
+          explanation_en: string | null
+          fake_probability: number | null
+          file_size_bytes: number | null
+          id: string
+          image_url: string
+          model_version: string | null
+          original_filename: string | null
+          real_probability: number | null
+          trust_score: number | null
+          user_id: string | null
+          verdict: string | null
+          verdict_bn: string | null
+        }
+        Insert: {
+          analysis_time_ms?: number | null
+          confidence?: number | null
+          created_at?: string
+          expires_at?: string
+          explanation_bn?: string | null
+          explanation_en?: string | null
+          fake_probability?: number | null
+          file_size_bytes?: number | null
+          id?: string
+          image_url: string
+          model_version?: string | null
+          original_filename?: string | null
+          real_probability?: number | null
+          trust_score?: number | null
+          user_id?: string | null
+          verdict?: string | null
+          verdict_bn?: string | null
+        }
+        Update: {
+          analysis_time_ms?: number | null
+          confidence?: number | null
+          created_at?: string
+          expires_at?: string
+          explanation_bn?: string | null
+          explanation_en?: string | null
+          fake_probability?: number | null
+          file_size_bytes?: number | null
+          id?: string
+          image_url?: string
+          model_version?: string | null
+          original_filename?: string | null
+          real_probability?: number | null
+          trust_score?: number | null
+          user_id?: string | null
+          verdict?: string | null
+          verdict_bn?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -58,7 +118,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_analyses: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          id: string | null
+          trust_score: number | null
+          verdict: string | null
+          verdict_bn: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
