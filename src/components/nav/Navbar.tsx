@@ -91,7 +91,7 @@ export function Navbar() {
       {open && (
         <div className="lg:hidden border-t border-[color:var(--border)] glass-strong">
           <ul className="px-4 py-3 space-y-1">
-            {links.map((l) => (
+            {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
               <li key={l.to}>
                 <Link to={l.to} onClick={() => setOpen(false)} className="block px-3 py-2 rounded-md hover:bg-cyan/10 text-sm">{l.label}</Link>
               </li>
