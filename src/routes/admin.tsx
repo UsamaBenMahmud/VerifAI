@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings, Link2 } from "lucide-react";
+import { LayoutDashboard, Microscope, Users, Bot, DollarSign, Flag, Key, Settings, Link2, Presentation as PresentationIcon, Upload, Trash2, FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminAnalyses, hourly, agentPerf } from "@/lib/mockData";
