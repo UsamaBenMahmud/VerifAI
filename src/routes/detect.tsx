@@ -1,16 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Upload, Camera, Link as LinkIcon, FileText, Share2, Flag, Code2, ChevronDown, Clipboard, Beaker, Download, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
-import { CameraModal } from "@/components/detect/CameraModal";
-import { analyze, bandFor, fileToBase64, extractVideoFrame, isValidUrl, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { analyze, bandFor, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 
 export const Route = createFileRoute("/detect")({
   head: () => ({ meta: [
     { title: "Detect — VerifAI" },
-    { name: "description", content: "Upload a video, image, or URL and get a deepfake trust score in 6 seconds." },
-    { property: "og:title", content: "VerifAI — Analyze Content" },
+    { name: "description", content: "Upload a video and get a deepfake trust score in seconds." },
+    { property: "og:title", content: "VerifAI — Analyze Video" },
     { property: "og:description", content: "Multi-agent deepfake analysis with Bangla + English reasoning." },
   ]}),
   component: DetectPage,
