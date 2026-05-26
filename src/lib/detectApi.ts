@@ -225,67 +225,138 @@ export class HfSleepingError extends Error {
 }
 
 const HF_SPACE = "https://aahsann-deepfake-detector.hf.space";
-const HF_PATHS = ["/run/predict", "/api/predict", "/gradio_api/run/predict"];
+
+function isSleepingText(s: string): boolean {
+  return /sleep|starting|loading|building|waking/i.test(s);
+}
+
+function mapHfPayload(payload: unknown): AnalysisResult | null {
+  let trustScore: number | undefined;
+  let verdict = "";
+  let verdictBn = "";
+  let confidence = 0;
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>;
+    trustScore = typeof p.trust_score === "number" ? p.trust_score : undefined;
+    verdict = String(p.verdict ?? (p as { label?: unknown }).label ?? "");
+    verdictBn = String(p.verdict_bn ?? "");
+    confidence = Number(p.confidence ?? 0);
+  } else if (typeof payload === "string") {
+    verdict = payload;
+    const m = payload.match(/(\d+(?:\.\d+)?)/);
+    if (m) trustScore = parseFloat(m[1]);
+  } else {
+    return null;
+  }
+  const score = typeof trustScore === "number" ? Math.round(trustScore) : 50;
+  return {
+    ...MOCK,
+    score,
+    confidence: confidence || 90,
+    subScores: { ...MOCK.subScores, vision: 100 - score },
+    riskFactors: [
+      {
+        severity: score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW",
+        titleEn: verdict || "Analysis complete",
+        titleBn: verdictBn || verdict || "বিশ্লেষণ সম্পন্ন",
+        detailEn: `Trust Score: ${score}/100`,
+        detailBn: `ট্রাস্ট স্কোর: ${score}/১০০`,
+      },
+    ],
+    source: "huggingface",
+  };
+}
 
 async function tryHfSpace(input: AnalyzeInput, signal: AbortSignal): Promise<AnalysisResult | null> {
   if (input.kind !== "image") return null;
-  const base64String = stripBase64Prefix(input.base64);
-  const body = JSON.stringify({ data: [base64String] });
-  let lastText = "";
-  for (const path of HF_PATHS) {
-    let res: Response;
-    try {
-      res = await fetch(`${HF_SPACE}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        signal,
-      });
-    } catch {
-      continue;
+
+  // Gradio expects a data URL, not raw base64 — otherwise the Image component
+  // silently errors (we'd see `event: error, data: {error: null}`).
+  const b64 = stripBase64Prefix(input.base64);
+  const mime = input.mime || "image/jpeg";
+  const dataUrl = `data:${mime};base64,${b64}`;
+
+  // 60s overall timeout, linked to caller signal.
+  const ctrl = new AbortController();
+  const onAbort = () => ctrl.abort();
+  signal.addEventListener("abort", onAbort);
+  const timeout = setTimeout(() => ctrl.abort(), 60_000);
+
+  try {
+    // --- Step A: enqueue ---
+    const enqueue = await fetch(`${HF_SPACE}/gradio_api/call/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [dataUrl] }),
+      signal: ctrl.signal,
+    });
+
+    if (enqueue.status === 503) throw new HfSleepingError();
+    if (!enqueue.ok) {
+      const txt = await enqueue.text().catch(() => "");
+      if (isSleepingText(txt)) throw new HfSleepingError();
+      return null;
     }
-    if (res.ok) {
-      const json = (await res.json()) as { data?: unknown[] };
-      const payload = json?.data?.[0];
-      let trustScore: number | undefined;
-      let verdict = "";
-      let verdictBn = "";
-      let confidence = 0;
-      if (payload && typeof payload === "object") {
-        const p = payload as Record<string, unknown>;
-        trustScore = typeof p.trust_score === "number" ? p.trust_score : undefined;
-        verdict = String(p.verdict ?? (p as { label?: unknown }).label ?? "");
-        verdictBn = String(p.verdict_bn ?? "");
-        confidence = Number(p.confidence ?? 0);
-      } else if (typeof payload === "string") {
-        verdict = payload;
-      } else {
-        return null;
+
+    const enqueueJson = (await enqueue.json()) as { event_id?: string };
+    const eventId = enqueueJson?.event_id;
+    if (!eventId) return null;
+
+    // --- Step B: poll SSE result ---
+    const stream = await fetch(`${HF_SPACE}/gradio_api/call/predict/${eventId}`, {
+      method: "GET",
+      signal: ctrl.signal,
+    });
+    if (stream.status === 503) throw new HfSleepingError();
+    if (!stream.ok || !stream.body) {
+      const txt = await stream.text().catch(() => "");
+      if (isSleepingText(txt)) throw new HfSleepingError();
+      return null;
+    }
+
+    const reader = stream.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      // SSE frames are separated by blank lines.
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        let eventName = "message";
+        const dataLines: string[] = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+        }
+        const dataStr = dataLines.join("\n");
+        if (eventName === "complete") {
+          try {
+            const parsed = JSON.parse(dataStr) as unknown[];
+            return mapHfPayload(parsed?.[0]);
+          } catch {
+            return null;
+          }
+        }
+        if (eventName === "error") {
+          if (isSleepingText(dataStr)) throw new HfSleepingError();
+          return null;
+        }
       }
-      const score = typeof trustScore === "number" ? Math.round(trustScore) : 50;
-      return {
-        ...MOCK,
-        score,
-        confidence: confidence || 90,
-        subScores: { ...MOCK.subScores, vision: 100 - score },
-        riskFactors: [
-          {
-            severity: score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW",
-            titleEn: verdict || "Analysis complete",
-            titleBn: verdictBn || verdict || "বিশ্লেষণ সম্পন্ন",
-            detailEn: `Trust Score: ${score}/100`,
-            detailBn: `ট্রাস্ট স্কোর: ${score}/১০০`,
-          },
-        ],
-        source: "huggingface",
-      };
     }
-    if (res.status === 503) throw new HfSleepingError();
-    lastText = await res.text().catch(() => "");
-    if (/sleep|starting|loading|building/i.test(lastText)) throw new HfSleepingError();
-    if (res.status !== 404 && res.status !== 405) break;
+    return null;
+  } catch (e) {
+    if (e instanceof HfSleepingError) throw e;
+    if ((e as { name?: string })?.name === "AbortError" && signal.aborted) throw e;
+    return null;
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener("abort", onAbort);
   }
-  return null;
 }
 
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
