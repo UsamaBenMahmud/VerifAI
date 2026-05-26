@@ -16,6 +16,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function normalizeHfSpaceUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim().replace(/\/$/, "");
+  const match = trimmed.match(/^https:\/\/huggingface\.co\/spaces\/([^/]+)\/([^/]+)$/i);
+  if (!match) return trimmed;
+  return `https://${match[1]}-${match[2]}.hf.space`;
+}
+
 export const Route = createFileRoute("/api/analyze-image")({
   server: {
     handlers: {
@@ -52,7 +59,7 @@ export const Route = createFileRoute("/api/analyze-image")({
           const imageUrl = urlData.signedUrl;
 
           // 3. Call Hugging Face model
-          const modelResult = await callDeepfakeModel(file, buffer, HF_MODEL_URL);
+          const modelResult = await callDeepfakeModel(file, buffer, normalizeHfSpaceUrl(HF_MODEL_URL));
 
           // 4. Generate bilingual explanation via Lovable AI
           const explanation = await generateBilingualExplanation(modelResult, LOVABLE_API_KEY);
@@ -118,11 +125,20 @@ async function callDeepfakeModel(
   const base64 = bytesToBase64(new Uint8Array(buffer));
   const dataUrl = `data:${file.type};base64,${base64}`;
 
-  const res = await fetch(`${hfUrl.replace(/\/$/, "")}/run/predict`, {
+  const body = JSON.stringify({ data: [dataUrl] });
+  const endpointBase = hfUrl.replace(/\/$/, "");
+  let res = await fetch(`${endpointBase}/run/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data: [dataUrl] }),
+    body,
   });
+  if (res.status === 404) {
+    res = await fetch(`${endpointBase}/api/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`HF model error ${res.status}: ${txt.slice(0, 200)}`);
