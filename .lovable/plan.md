@@ -1,31 +1,40 @@
-## Goal
-Wire the upload button on `/detect` to call your Hugging Face Space directly from the browser at `https://aahsann-deepfake-detector.hf.space`, parse Trust Score and Verdict from `data[0]`, and surface a friendly "model is waking up" message when the Space is sleeping.
+# Fix Hugging Face Space integration
 
-## Changes
+The Space `aahsann-deepfake-detector` runs Gradio 4+, which removed `/run/predict` and `/api/predict`. The current `tryHfSpace` POSTs to those paths, gets 404s, and falls through to the offline mock. That's why you keep seeing offline results.
 
-### 1. `src/lib/detectApi.ts` — add a direct HF Space client
-Add a new function `tryHfSpace(input)` that:
-- Only runs for `kind: "image"`.
-- Strips the `data:image/...;base64,` prefix from the base64 string.
-- POSTs to `https://aahsann-deepfake-detector.hf.space/run/predict` with body `{ "data": [base64String] }` and `Content-Type: application/json`. If that returns 404, retry against `/api/predict` and `/gradio_api/run/predict` (different Gradio versions expose different paths).
-- On HTTP 503, or a response body containing "sleeping" / "is starting" / "loading", throw a typed `HfSleepingError` so the UI can show the wake-up message.
-- On success, read `json.data[0]` (Gradio always wraps outputs in a `data` array). The Space may return either a JSON object (`{ trust_score, verdict, ... }`) or a plain string — handle both:
-  - object → use `trust_score` and `verdict` directly.
-  - string → put the whole string in `verdict`, leave `trust_score` undefined and derive a neutral score.
-- Map into the existing `AnalysisResult` shape (`score`, `confidence`, `riskFactors[0].titleEn = verdict`) with `source: "huggingface"` so the existing results UI keeps working.
+## What to change
 
-Update `analyze()` to try `tryHfSpace` FIRST (before the current server / primary / HF inference fallbacks), and let `HfSleepingError` bubble up instead of being swallowed.
+### 1. `src/lib/detectApi.ts` — rewrite `tryHfSpace`
 
-### 2. `src/routes/detect.tsx` — sleeping-space UX + clearer spinner
-- In `startAnalysis`'s `catch`, detect `HfSleepingError` (by `name` or a flag) and set a dedicated message: "🤖 Model is waking up on Hugging Face — this can take 30–60 seconds. Please try again in a moment." (with Bangla equivalent). Keep current generic message for other errors.
-- Replace the analyzing-stage heading with the requested copy: **"AI is analyzing…"** / **"AI বিশ্লেষণ করছে…"**, keeping the existing animated step list and progress bar underneath.
-- After results render, the existing Results header already shows the Trust Score gauge and the verdict band — confirm `riskFactors[0].titleEn` (the HF verdict) is visible at the top of the Evidence panel; no structural change needed.
+Replace the multi-path POST loop with the Gradio 4 two-step queue flow:
 
-### 3. Leave untouched
-- `src/routes/api/analyze-image.ts` (server pipeline) stays in place as a fallback path but is no longer the primary call.
-- Video handling still extracts a frame client-side via `extractVideoFrame` and sends it as an image — HF Space only accepts images.
+**Step A — enqueue**
+- `POST https://aahsann-deepfake-detector.hf.space/gradio_api/call/predict`
+- Body: `{ "data": ["data:<mime>;base64,<b64>"] }` — full data URL, not stripped base64. Gradio's Image component silently fails on raw base64 (matches the `event: error, data: {error: null}` we saw).
+- Response: `{ "event_id": "<id>" }`.
+- On HTTP 503 or body containing `sleep|starting|loading|building` → throw `HfSleepingError`.
 
-## Technical notes
-- Direct browser → HF call means no CORS proxy on our side; HF Spaces send permissive CORS headers, so this works from the browser.
-- We keep the existing client-side base64 conversion (`fileToBase64`) — it already runs only in browser event handlers, so SSR is safe.
-- No new dependencies, no schema changes, no secrets needed (HF Space is public).
+**Step B — poll result via SSE**
+- `GET https://aahsann-deepfake-detector.hf.space/gradio_api/call/predict/<event_id>`
+- Read `res.body.getReader()` with `TextDecoder`, accumulate chunks, parse SSE frames (`event: <name>\ndata: <json>\n\n`).
+- On `event: complete` → `JSON.parse(data)` is an array; first element is the model output. Map into `AnalysisResult` (Trust Score → `score`, Verdict → `riskFactors[0].titleEn`), `source: "huggingface"`.
+- On `event: error` → if message mentions sleeping/starting, throw `HfSleepingError`; otherwise return `null` to fall through.
+- Overall 60 s timeout via `AbortController` linked to the passed-in `signal`.
+
+Keep `HfSleepingError`, the `analyze()` fallback order, and all existing UI mapping unchanged.
+
+### 2. `src/routes/api/analyze-image.ts` — same queue flow on the server
+
+Mirror the same two-step call so the server-side fallback also works against Gradio 4.
+
+## Out of scope
+
+- No UI changes — the existing "AI is analyzing…" spinner and sleeping-Space toast in `src/routes/detect.tsx` already handle both states.
+- No changes to `tryPrimary`, `tryHF`, or the mock fallback.
+
+## How to verify
+
+1. Upload an image on `/detect`.
+2. Network tab should show `POST /gradio_api/call/predict` (200) then `GET /gradio_api/call/predict/<id>` (200, `text/event-stream`).
+3. Result page shows `source: "huggingface"` with the model's Trust Score and Verdict instead of the canned offline numbers.
+4. If the Space is asleep, the first POST returns 503 and the UI shows the "model is waking up" message.
