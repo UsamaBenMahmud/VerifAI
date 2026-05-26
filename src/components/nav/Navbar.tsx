@@ -49,7 +49,7 @@ export function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="shrink-0"><Logo /></Link>
         <ul className="hidden lg:flex items-center gap-1">
-          {links.map((l) => {
+          {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
             return (
               <li key={l.to}>
