@@ -127,8 +127,9 @@ export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promis
 
   return {
     score,
+    rawScore,
     confidence: conf,
-    confidenceMargin: 2.5,
+    confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
     subScores: {
       vision: visionVal,
       metadata: metadataVal,
