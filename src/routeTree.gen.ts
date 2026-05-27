@@ -9,11 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SubmitRumorRouteImport } from './routes/submit-rumor'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScoringRouteImport } from './routes/scoring'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LawsRouteImport } from './routes/laws'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DocsRouteImport } from './routes/docs'
@@ -23,6 +25,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAnalyzeImageRouteImport } from './routes/api/analyze-image'
 
+const SubmitRumorRoute = SubmitRumorRouteImport.update({
+  id: '/submit-rumor',
+  path: '/submit-rumor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -46,6 +53,11 @@ const LoginRoute = LoginRouteImport.update({
 const LawsRoute = LawsRouteImport.update({
   id: '/laws',
   path: '/laws',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HelpRoute = HelpRouteImport.update({
@@ -97,11 +109,13 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
+  '/history': typeof HistoryRoute
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
+  '/submit-rumor': typeof SubmitRumorRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRoutesByTo {
@@ -112,11 +126,13 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
+  '/history': typeof HistoryRoute
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
+  '/submit-rumor': typeof SubmitRumorRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRoutesById {
@@ -128,11 +144,13 @@ export interface FileRoutesById {
   '/docs': typeof DocsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/help': typeof HelpRoute
+  '/history': typeof HistoryRoute
   '/laws': typeof LawsRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
+  '/submit-rumor': typeof SubmitRumorRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRouteTypes {
@@ -145,11 +163,13 @@ export interface FileRouteTypes {
     | '/docs'
     | '/forgot-password'
     | '/help'
+    | '/history'
     | '/laws'
     | '/login'
     | '/reset-password'
     | '/scoring'
     | '/signup'
+    | '/submit-rumor'
     | '/api/analyze-image'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -160,11 +180,13 @@ export interface FileRouteTypes {
     | '/docs'
     | '/forgot-password'
     | '/help'
+    | '/history'
     | '/laws'
     | '/login'
     | '/reset-password'
     | '/scoring'
     | '/signup'
+    | '/submit-rumor'
     | '/api/analyze-image'
   id:
     | '__root__'
@@ -175,11 +197,13 @@ export interface FileRouteTypes {
     | '/docs'
     | '/forgot-password'
     | '/help'
+    | '/history'
     | '/laws'
     | '/login'
     | '/reset-password'
     | '/scoring'
     | '/signup'
+    | '/submit-rumor'
     | '/api/analyze-image'
   fileRoutesById: FileRoutesById
 }
@@ -191,16 +215,25 @@ export interface RootRouteChildren {
   DocsRoute: typeof DocsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HelpRoute: typeof HelpRoute
+  HistoryRoute: typeof HistoryRoute
   LawsRoute: typeof LawsRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ScoringRoute: typeof ScoringRoute
   SignupRoute: typeof SignupRoute
+  SubmitRumorRoute: typeof SubmitRumorRoute
   ApiAnalyzeImageRoute: typeof ApiAnalyzeImageRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/submit-rumor': {
+      id: '/submit-rumor'
+      path: '/submit-rumor'
+      fullPath: '/submit-rumor'
+      preLoaderRoute: typeof SubmitRumorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -234,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/laws'
       fullPath: '/laws'
       preLoaderRoute: typeof LawsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/help': {
@@ -303,11 +343,13 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRoute: DocsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HelpRoute: HelpRoute,
+  HistoryRoute: HistoryRoute,
   LawsRoute: LawsRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ScoringRoute: ScoringRoute,
   SignupRoute: SignupRoute,
+  SubmitRumorRoute: SubmitRumorRoute,
   ApiAnalyzeImageRoute: ApiAnalyzeImageRoute,
 }
 export const routeTree = rootRouteImport

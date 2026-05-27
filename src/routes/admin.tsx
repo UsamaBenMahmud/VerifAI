@@ -435,29 +435,191 @@ function StatusBadge({ status }: { status: "pending" | "verified" | "authentic" 
 }
 
 function ApiKeysTab() {
-  const keys = [
-    { name: "Rumor Scanner BD", key: "vai_live_••••8a2f", usage: "12,432", limit: "100k/mo" },
-    { name: "Prothom Alo Newsroom", key: "vai_live_••••3c1d", usage: "4,201", limit: "50k/mo" },
-  ];
+  const [keys, setKeys] = useState<import("@/lib/localStore").ApiKey[]>([]);
+  const [name, setName] = useState("");
+  const [plan, setPlan] = useState<"free" | "journalist" | "enterprise">("free");
+  const [justCreated, setJustCreated] = useState<import("@/lib/localStore").ApiKey | null>(null);
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [codeTab, setCodeTab] = useState<"curl" | "python" | "js" | "bn">("curl");
+
+  useEffect(() => {
+    import("@/lib/localStore").then((m) => setKeys(m.getApiKeys()));
+  }, []);
+
+  const persist = (next: import("@/lib/localStore").ApiKey[]) => {
+    setKeys(next);
+    import("@/lib/localStore").then((m) => m.saveApiKeys(next));
+  };
+
+  const generate = async () => {
+    if (!name.trim()) return toast.error("Enter a key name");
+    const mod = await import("@/lib/localStore");
+    const k = mod.generateApiKey(name.trim(), plan);
+    const next = [k, ...keys];
+    persist(next);
+    setJustCreated(k);
+    setName("");
+    toast.success("API key generated");
+  };
+
+  const toggleReveal = (id: string) => {
+    setRevealed((r) => ({ ...r, [id]: !r[id] }));
+    setTimeout(() => setRevealed((r) => ({ ...r, [id]: false })), 5000);
+  };
+  const copyKey = (key: string) => { navigator.clipboard?.writeText(key); toast.success("Copied"); };
+  const toggleActive = (id: string) => persist(keys.map((k) => k.id === id ? { ...k, is_active: !k.is_active } : k));
+  const remove = (id: string) => { if (confirm("Delete this key?")) persist(keys.filter((k) => k.id !== id)); };
+  const simulate = (id: string) => persist(keys.map((k) => k.id === id
+    ? { ...k, requests_today: k.requests_today + 1, requests_total: k.requests_total + 1, last_used: new Date().toISOString() } : k));
+
+  const mask = (key: string) => `${key.slice(0, 5)}${"•".repeat(16)}`;
+  const stats = { total: keys.length, active: keys.filter((k) => k.is_active).length, today: keys.reduce((s, k) => s + k.requests_today, 0) };
+
+  const codeSamples = {
+    curl: `curl -X POST "https://api.verifai.app/v1/analyze" \\
+  -H "Authorization: Bearer vfai_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"image_url": "https://example.com/image.jpg"}'`,
+    python: `import requests
+
+response = requests.post(
+    "https://api.verifai.app/v1/analyze",
+    headers={"Authorization": "Bearer vfai_YOUR_KEY"},
+    json={"image_url": "https://example.com/image.jpg"}
+)
+result = response.json()
+print(f"Trust Score: {result['trust_score']}/100")
+print(f"Verdict: {result['verdict_bn']}")`,
+    js: `const response = await fetch("https://api.verifai.app/v1/analyze", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer vfai_YOUR_KEY",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ image_url: "https://example.com/image.jpg" })
+});
+const result = await response.json();
+console.log(\`Trust Score: \${result.trust_score}/100\`);`,
+    bn: `# আপনার API কী ব্যবহার করে যেকোনো ছবি বিশ্লেষণ করুন।
+# Authorization হেডারে আপনার কী যোগ করুন।
+
+curl -X POST "https://api.verifai.app/v1/analyze" \\
+  -H "Authorization: Bearer vfai_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"image_url": "https://example.com/image.jpg"}'`,
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between"><h2 className="font-display text-2xl font-bold">API Keys</h2><button className="rounded-md bg-cyan px-3 py-2 text-sm text-[color:var(--bg-deep)] font-semibold glow-cyan">Generate Key</button></div>
-      <div className="glass rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+    <div className="space-y-6">
+      <h2 className="font-display text-2xl font-bold">API Keys</h2>
+
+      {/* Generator */}
+      <div className="glass rounded-xl p-5 space-y-3">
+        <h3 className="font-display font-semibold">Generate New API Key</h3>
+        <div className="grid sm:grid-cols-[1fr_180px_140px] gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="Key name (e.g. My App, Rumor Scanner Integration)"
+            className="rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-3 py-2 text-sm focus:border-cyan outline-none" />
+          <select value={plan} onChange={(e) => setPlan(e.target.value as any)}
+            className="rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-3 py-2 text-sm focus:border-cyan outline-none">
+            <option value="free">Free (100/day)</option>
+            <option value="journalist">Journalist (1,000/day)</option>
+            <option value="enterprise">Enterprise (10,000/day)</option>
+          </select>
+          <button onClick={generate} className="rounded-md bg-cyan px-3 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">+ Generate Key</button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <KPI label="Total Keys" value={String(stats.total)} />
+        <KPI label="Active Keys" value={String(stats.active)} />
+        <KPI label="Requests Today" value={String(stats.today)} />
+      </div>
+
+      {/* Table */}
+      <div className="glass rounded-xl overflow-x-auto">
+        <table className="w-full text-sm min-w-[820px]">
           <thead className="bg-[color:var(--bg-surface)]/60 text-xs uppercase tracking-widest text-muted-foreground">
-            <tr><th className="text-left px-3 py-3">Name</th><th className="text-left px-3 py-3">Key</th><th className="text-left px-3 py-3">Usage</th><th className="text-left px-3 py-3">Rate Limit</th><th className="text-left px-3 py-3">Actions</th></tr>
-          </thead>
-          <tbody>{keys.map(k => (
-            <tr key={k.key} className="border-t border-[color:var(--border)]">
-              <td className="px-3 py-2">{k.name}</td>
-              <td className="px-3 py-2 font-mono text-xs text-cyan">{k.key}</td>
-              <td className="px-3 py-2">{k.usage}</td>
-              <td className="px-3 py-2">{k.limit}</td>
-              <td className="px-3 py-2"><button className="text-xs text-danger hover:underline">Revoke</button></td>
+            <tr>
+              <th className="text-left px-3 py-3">Name</th>
+              <th className="text-left px-3 py-3">Key</th>
+              <th className="text-left px-3 py-3">Plan</th>
+              <th className="text-left px-3 py-3">Usage</th>
+              <th className="text-left px-3 py-3">Created</th>
+              <th className="text-left px-3 py-3">Status</th>
+              <th className="text-left px-3 py-3">Actions</th>
             </tr>
-          ))}</tbody>
+          </thead>
+          <tbody>
+            {keys.length === 0 ? (
+              <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">🔑 No API keys yet — generate your first one above</td></tr>
+            ) : keys.map((k) => {
+              const pct = (k.requests_today / k.rate_limit) * 100;
+              const barColor = pct > 80 ? "bg-danger" : pct > 50 ? "bg-warning" : "bg-safe";
+              return (
+                <tr key={k.id} className="border-t border-[color:var(--border)] hover:bg-cyan/5">
+                  <td className="px-3 py-3">{k.name}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-cyan">{revealed[k.id] ? k.key : mask(k.key)}</td>
+                  <td className="px-3 py-3"><span className="text-[10px] px-2 py-0.5 rounded border border-cyan/40 text-cyan uppercase font-mono">{k.plan}</span></td>
+                  <td className="px-3 py-3 min-w-[140px]">
+                    <div className="text-xs font-mono">{k.requests_today} / {k.rate_limit}</div>
+                    <div className="mt-1 h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                      <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{k.requests_total} total</div>
+                  </td>
+                  <td className="px-3 py-3 text-xs text-muted-foreground">{new Date(k.created_at).toLocaleDateString()}</td>
+                  <td className="px-3 py-3">{k.is_active
+                    ? <span className="text-[10px] text-safe">● Active</span>
+                    : <span className="text-[10px] text-muted-foreground">○ Disabled</span>}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex gap-1 flex-wrap text-[11px]">
+                      <button onClick={() => toggleReveal(k.id)} className="px-2 py-1 rounded border border-cyan/40 text-cyan hover:bg-cyan/10">👁</button>
+                      <button onClick={() => copyKey(k.key)} className="px-2 py-1 rounded border border-cyan/40 text-cyan hover:bg-cyan/10">📋</button>
+                      <button onClick={() => toggleActive(k.id)} className="px-2 py-1 rounded border border-warning/40 text-warning hover:bg-warning/10">{k.is_active ? "⏸" : "▶"}</button>
+                      <button onClick={() => simulate(k.id)} className="px-2 py-1 rounded border border-violet/40 text-violet hover:bg-violet/10">+1</button>
+                      <button onClick={() => remove(k.id)} className="px-2 py-1 rounded border border-danger/40 text-danger hover:bg-danger/10">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </table>
       </div>
+
+      {/* Code examples */}
+      <div className="glass rounded-xl p-5">
+        <h3 className="font-display font-semibold mb-3">Code Examples</h3>
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {(["curl", "python", "js", "bn"] as const).map((c) => (
+            <button key={c} onClick={() => setCodeTab(c)}
+              className={`rounded-full border px-3 py-1 text-xs ${codeTab === c ? "border-cyan bg-cyan/15 text-cyan" : "border-[color:var(--border)]"}`}>
+              {c === "curl" ? "cURL" : c === "python" ? "Python" : c === "js" ? "JavaScript" : "Bangla (বাংলা)"}
+            </button>
+          ))}
+        </div>
+        <pre className="bg-[color:var(--bg-deep)] rounded-md p-3 text-xs font-mono text-cyan/90 overflow-x-auto"><code>{codeSamples[codeTab]}</code></pre>
+      </div>
+
+      {/* Success modal */}
+      {justCreated && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={() => setJustCreated(null)}>
+          <div className="glass-strong rounded-2xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-xl font-bold">🔑 API Key Generated</h3>
+            <div className="mt-3 rounded-md bg-warning/10 border border-warning/40 p-3 text-xs text-warning">
+              ⚠️ Copy this key now. You won't be able to see it again.
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-md bg-[color:var(--bg-deep)] border border-cyan/30 p-3">
+              <code className="font-mono text-xs text-cyan break-all flex-1">{justCreated.key}</code>
+              <button onClick={() => copyKey(justCreated.key)} className="rounded-md bg-cyan/15 border border-cyan/40 text-cyan px-2 py-1 text-xs">📋 Copy</button>
+            </div>
+            <button onClick={() => setJustCreated(null)} className="mt-4 w-full rounded-md bg-cyan py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">I've saved my key</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -484,84 +646,95 @@ function SettingsTab() {
 }
 
 function PresentationTab() {
+  const [data, setData] = useState<string | null>(null);
+  const [meta, setMeta] = useState<import("@/lib/localStore").PresentationMeta | null>(null);
+  const [slideCount, setSlideCountLocal] = useState(8);
   const [busy, setBusy] = useState(false);
-  const [current, setCurrent] = useState<{ id: string; title: string; original_filename: string | null; file_size_bytes: number | null; url: string | null } | null>(null);
 
-  const load = async () => {
-    const { data } = await supabase
-      .from("presentations")
-      .select("id,title,original_filename,file_size_bytes,slide_image_urls")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!data) { setCurrent(null); return; }
-    const path = data.slide_image_urls?.[0];
-    const url = path ? supabase.storage.from("uploads").getPublicUrl(path).data.publicUrl : null;
-    setCurrent({ id: data.id, title: data.title, original_filename: data.original_filename, file_size_bytes: data.file_size_bytes, url });
-  };
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    import("@/lib/localStore").then((m) => {
+      const p = m.getPresentation();
+      setData(p.data); setMeta(p.meta); setSlideCountLocal(p.slides);
+    });
+  }, []);
 
   const onUpload = async (f: File) => {
-    if (f.size > 25 * 1024 * 1024) return toast.error("File too large (max 25MB)");
+    if (f.size > 100 * 1024 * 1024) return toast.error("File too large (max 100MB)");
+    const ext = f.name.split(".").pop()?.toLowerCase();
+    if (ext !== "pdf" && ext !== "pptx") return toast.error("Only .pptx or .pdf");
     setBusy(true);
-    const ext = f.name.split(".").pop() || "pptx";
-    const path = `presentations/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("uploads").upload(path, f, { contentType: f.type, upsert: false });
-    if (upErr) { setBusy(false); return toast.error(upErr.message); }
-    const { data: userData } = await supabase.auth.getUser();
-    await supabase.from("presentations").update({ is_active: false }).eq("is_active", true);
-    const { error: insErr } = await supabase.from("presentations").insert({
-      title: f.name.replace(/\.[^.]+$/, ""),
-      original_filename: f.name,
-      file_size_bytes: f.size,
-      slide_image_urls: [path],
-      uploaded_by: userData.user?.id ?? null,
-      is_active: true,
-    });
-    setBusy(false);
-    if (insErr) return toast.error(insErr.message);
-    toast.success("Presentation published to Docs");
-    load();
+    try {
+      const mod = await import("@/lib/localStore");
+      const b64 = await mod.fileToBase64(f);
+      const newMeta: import("@/lib/localStore").PresentationMeta = {
+        filename: f.name, uploadedAt: Date.now(), fileType: ext as "pdf" | "pptx", size: f.size,
+      };
+      mod.setPresentation(b64, newMeta);
+      setData(b64); setMeta(newMeta);
+      toast.success(`✅ Presentation uploaded — ${slideCount} slides ready`);
+    } catch (e: any) {
+      toast.error(e?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const onDelete = async () => {
-    if (!current) return;
-    setBusy(true);
-    await supabase.from("presentations").update({ is_active: false }).eq("id", current.id);
-    setBusy(false);
-    toast.success("Removed from Docs");
-    load();
+  const onSlides = (n: number) => {
+    setSlideCountLocal(n);
+    import("@/lib/localStore").then((m) => m.setSlideCount(n));
+  };
+
+  const onClear = async () => {
+    if (!confirm("Remove presentation?")) return;
+    const mod = await import("@/lib/localStore");
+    mod.clearPresentation();
+    setData(null); setMeta(null);
+    toast.success("Presentation cleared");
   };
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="font-display text-2xl font-bold">Presentation</h2>
-        <p className="text-sm text-muted-foreground">Upload the slide deck (PPTX or PDF). It appears live on the <Link to="/docs" className="text-cyan hover:underline">Docs → Presentation</Link> tab for all visitors.</p>
+        <p className="text-sm text-muted-foreground">Upload the slide deck (PPTX or PDF, max 100MB). It appears live on the <Link to="/docs" className="text-cyan hover:underline">Docs → Presentation</Link> tab for all visitors.</p>
       </div>
 
-      {current && (
+      {meta && (
         <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
           <FileText className="h-6 w-6 text-cyan" />
           <div className="flex-1 min-w-0">
-            <div className="font-display truncate">{current.original_filename || current.title}</div>
-            <div className="text-xs text-muted-foreground">{current.file_size_bytes ? (current.file_size_bytes / 1024 / 1024).toFixed(2) + " MB" : ""} · Active</div>
+            <div className="font-display truncate">{meta.filename}</div>
+            <div className="text-xs text-muted-foreground">
+              {(meta.size / 1024 / 1024).toFixed(2)} MB · {meta.fileType.toUpperCase()} · uploaded {new Date(meta.uploadedAt).toLocaleString()}
+            </div>
           </div>
-          {current.url && <a href={current.url} download className="text-xs text-cyan hover:underline">Download</a>}
-          <button onClick={onDelete} disabled={busy} className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"><Trash2 className="h-3 w-3" /> Remove</button>
+          <button onClick={onClear} className="inline-flex items-center gap-1 text-xs text-danger hover:underline">
+            <Trash2 className="h-3 w-3" /> Clear
+          </button>
         </div>
       )}
 
       <label className="block border-2 border-dashed border-cyan/40 rounded-xl p-8 text-center cursor-pointer hover:bg-cyan/5">
         <Upload className="h-6 w-6 text-cyan mx-auto" />
         <div className="mt-2 font-display font-semibold">{busy ? "Uploading…" : "Upload PPTX / PDF"}</div>
-        <div className="text-xs text-muted-foreground">Max 25MB · Replaces the current active deck</div>
+        <div className="text-xs text-muted-foreground">Max 100MB · Replaces current deck</div>
         <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
           className="hidden" disabled={busy}
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
       </label>
+
+      <div className="glass rounded-xl p-4 flex items-center gap-3">
+        <label className="text-sm font-semibold">How many slides?</label>
+        <input type="number" min={1} max={100} value={slideCount} onChange={(e) => onSlides(Number(e.target.value))}
+          className="w-24 rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-3 py-1.5 text-sm" />
+        <span className="text-xs text-muted-foreground">Shown as numbered slide cards on the public Docs page</span>
+      </div>
+
+      {data && meta?.fileType === "pdf" && (
+        <div className="glass rounded-xl p-2">
+          <iframe src={data} className="w-full h-[60vh] rounded bg-black" title="Preview" />
+        </div>
+      )}
     </div>
   );
 }

@@ -140,5 +140,5 @@ export function isValidUrl(s: string): boolean {
   return /^https?:\/\/[^\s]+\.[^\s]+/i.test(s.trim());
 }
 
-export const MAX_BYTES = 50 * 1024 * 1024;
+export const MAX_BYTES = 200 * 1024 * 1024;
 export const ACCEPT = "video/mp4,video/quicktime,video/webm,video/x-msvideo";

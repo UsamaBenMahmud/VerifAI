@@ -10,6 +10,8 @@ import { Navbar } from "@/components/nav/Navbar";
 import { Footer } from "@/components/nav/Footer";
 import { LanguageProvider } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { DemoBanner } from "@/components/brand/DemoBanner";
+import { ShortcutsHelp } from "@/components/brand/ShortcutsHelp";
 
 function NotFoundComponent() {
   return (
@@ -94,11 +96,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <div className="relative min-h-screen flex flex-col">
+          <DemoBanner />
           <Navbar />
           <main className="flex-1"><Outlet /></main>
           <Footer />
+          <ShortcutsHelp />
         </div>
-        <Toaster theme="dark" position="top-right" richColors />
+        <Toaster theme="dark" position="bottom-right" richColors />
       </LanguageProvider>
     </QueryClientProvider>
   );

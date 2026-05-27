@@ -70,53 +70,53 @@ function H2({ children }: { children: React.ReactNode }) {
 }
 
 function Presentation() {
-  const defaultSlides = [
-    "The Problem — 60M Users, Zero Protection",
-    "Meet VerifAI — Bangla-First Detection",
-    "Live Demo — Trust Score in Action",
-    "4-Agent AI Architecture",
-    "Data Strategy & Knowledge Graph",
-    "Ethical Safeguards & Privacy",
-    "KPIs & Accuracy Targets",
-    "Roadmap — Build Locally, Lead Globally",
-  ];
-  const [deck, setDeck] = useState<{ url: string; name: string; isPdf: boolean } | null>(null);
+  const [data, setData] = useState<string | null>(null);
+  const [meta, setMeta] = useState<import("@/lib/localStore").PresentationMeta | null>(null);
+  const [slides, setSlides] = useState(8);
+  const [active, setActive] = useState(1);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("presentations")
-        .select("original_filename,title,slide_image_urls")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const path = data?.slide_image_urls?.[0];
-      if (!path) return;
-      const url = supabase.storage.from("uploads").getPublicUrl(path).data.publicUrl;
-      const name = data?.original_filename || data?.title || "verifai-deck";
-      setDeck({ url, name, isPdf: /\.pdf$/i.test(name) });
-    })();
+    import("@/lib/localStore").then((m) => {
+      const p = m.getPresentation();
+      setData(p.data); setMeta(p.meta); setSlides(p.slides);
+    });
   }, []);
+
+  const download = () => {
+    if (!data || !meta) return;
+    const a = document.createElement("a");
+    a.href = data; a.download = meta.filename; a.click();
+  };
+
+  const scrollToViewer = (n: number) => {
+    setActive(n);
+    document.getElementById("deck-viewer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const gradients = [
+    "from-cyan/20 to-violet/20", "from-violet/20 to-danger/20", "from-cyan/20 to-safe/20",
+    "from-warning/20 to-danger/20", "from-safe/20 to-cyan/20", "from-violet/20 to-cyan/20",
+  ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <H2>Slide Deck</H2>
-        {deck && (
-          <a href={deck.url} download={deck.name} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Download Deck</a>
+        {data && meta && (
+          <button onClick={download} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">⬇️ Download Original</button>
         )}
       </div>
 
-      <div className="glass rounded-2xl p-4 mb-6">
-        {deck ? (
-          deck.isPdf ? (
-            <iframe src={deck.url} title={deck.name} className="w-full h-[70vh] rounded-lg bg-black" />
+      <div id="deck-viewer" className="glass rounded-2xl p-4 mb-6">
+        {data && meta ? (
+          meta.fileType === "pdf" ? (
+            <iframe src={`${data}#page=${active}`} title={meta.filename} className="w-full h-[70vh] rounded-lg bg-black" />
           ) : (
             <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex flex-col items-center justify-center text-center p-6">
               <FileText className="h-12 w-12 text-cyan mb-3" />
-              <div className="font-display text-lg">{deck.name}</div>
-              <p className="text-xs text-muted-foreground mt-1">PPTX preview not supported inline. Use the Download button above to view.</p>
+              <div className="font-display text-lg">📊 Presentation uploaded</div>
+              <p className="text-sm text-muted-foreground mt-1">For best display, also export as PDF.</p>
+              <div className="mt-3 text-xs text-muted-foreground">{meta.filename} · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}</div>
             </div>
           )
         ) : (
@@ -130,17 +130,21 @@ function Presentation() {
         )}
       </div>
 
-      <h3 className="font-display text-lg font-semibold mb-3">Deck Outline</h3>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {defaultSlides.map((s, i) => (
-          <div key={s} className="glass rounded-xl aspect-video p-6 flex flex-col justify-between hover:border-cyan/40 transition">
-            <div>
-              <div className="font-mono text-xs text-cyan">SLIDE {String(i + 1).padStart(2, "0")}</div>
-              <div className="mt-3 font-display text-xl font-semibold">{s}</div>
-            </div>
-            <span className="self-end text-xs text-muted-foreground">Outline</span>
-          </div>
-        ))}
+      <h3 className="font-display text-lg font-semibold mb-3">Slides</h3>
+      <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {Array.from({ length: slides }).map((_, i) => {
+          const n = i + 1;
+          return (
+            <button key={n} onClick={() => scrollToViewer(n)}
+              className={`glass rounded-xl aspect-video p-5 flex flex-col justify-between hover:border-cyan/60 transition text-left bg-gradient-to-br ${gradients[i % gradients.length]} ${active === n ? "ring-2 ring-cyan glow-cyan" : ""}`}>
+              <div>
+                <div className="font-mono text-xs text-cyan">SLIDE {String(n).padStart(2, "0")}</div>
+                <div className="mt-3 font-display text-3xl font-bold">{n}</div>
+              </div>
+              <span className="self-end text-xs text-muted-foreground">Click to view</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
