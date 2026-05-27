@@ -225,20 +225,11 @@ function SignUpForm({ onDone, switchToSignin }: { onDone: () => void; switchToSi
 function AdminTab({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [code, setCode] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const onCodeChange = (v: string) => {
-    const digits = v.replace(/\D/g, "").slice(0, 6);
-    setCode(digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits);
-  };
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const raw = code.replace(/\s/g, "");
-    if (raw.length !== 6) return toast.error("Enter the 6-digit code");
-    if (raw !== "000000") return toast.error("Invalid authenticator code");
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
     if (error || !data.user) { setLoading(false); return toast.error(error?.message || "Login failed"); }
@@ -249,25 +240,17 @@ function AdminTab({ onDone }: { onDone: () => void }) {
       return toast.error("Not authorized — admin role required");
     }
     sessionStorage.setItem("adminSessionStart", String(Date.now()));
-    toast.success("Admin session started. All actions are logged.");
+    toast.success("Welcome, admin.");
     onDone();
   };
 
   return (
     <div className="mt-5">
-      <div className="rounded-md bg-danger/15 border border-danger/40 px-4 py-3 flex items-start gap-2">
-        <Lock className="h-4 w-4 text-danger shrink-0 mt-0.5" />
-        <div className="text-xs">
-          <div className="font-bold text-danger uppercase tracking-widest">🔒 Restricted Access</div>
-          <div className="text-muted-foreground mt-0.5">This portal is for authorized VerifAI administrators only.</div>
-          <div className="text-muted-foreground" lang="bn">শুধুমাত্র অনুমোদিত প্রশাসকদের জন্য</div>
-        </div>
-      </div>
-
-      <h1 className="mt-5 font-display text-2xl font-bold text-danger">Admin Sign In</h1>
+      <h1 className="mt-2 font-display text-2xl font-bold text-danger">Admin Sign In</h1>
+      <p className="text-sm text-muted-foreground">Use your admin email and password.</p>
 
       <form onSubmit={submit} className="mt-4 space-y-3">
-        <Field label="Administrator Email">
+        <Field label="Email">
           <input type="email" required placeholder="admin@verifai.app" value={email} onChange={e => setEmail(e.target.value)}
             className={`${inputCls} focus:border-danger focus:ring-danger/30`} />
         </Field>
@@ -280,25 +263,12 @@ function AdminTab({ onDone }: { onDone: () => void }) {
             </button>
           </div>
         </Field>
-        <Field label="Authenticator Code">
-          <input inputMode="numeric" required value={code} onChange={e => onCodeChange(e.target.value)}
-            placeholder="000 000" maxLength={7}
-            className={`${inputCls} font-mono tracking-[0.3em] text-center focus:border-danger focus:ring-danger/30`} />
-          <div className="mt-1 text-[11px] text-muted-foreground">Enter the 6-digit code from your authenticator app.</div>
-          <div className="text-[11px] text-warning">Demo mode: use code <span className="font-mono">000000</span></div>
-        </Field>
 
         <button disabled={loading} className="w-full rounded-md bg-danger py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           style={{ boxShadow: "0 0 20px rgba(255,59,92,0.5)" }}>
-          {loading ? "Verifying..." : "Admin Sign In →"}
+          {loading ? "Signing in..." : "Sign In →"}
         </button>
       </form>
-
-      <div className="mt-6 text-center space-y-1 text-[11px] text-muted-foreground">
-        <div>Admin access is by invitation only.</div>
-        <div>Contact: <span className="text-danger font-mono">security@verifai.app</span></div>
-        <div>All admin sessions are logged and audited.</div>
-      </div>
     </div>
   );
 }
