@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { LogOut, User as UserIcon, FileBarChart2, Shield, ScrollText } from "lucide-react";
+import { LogOut, User as UserIcon, FileBarChart2, Shield, ScrollText, Bell } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
