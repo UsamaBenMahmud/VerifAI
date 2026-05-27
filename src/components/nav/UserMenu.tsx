@@ -53,6 +53,9 @@ export function UserMenu({ initial, email, role }: { initial: string; email: str
             <DropdownMenuItem asChild>
               <Link to="/dashboard" className="flex items-center gap-2"><FileBarChart2 className="h-4 w-4" /> My Analyses</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/watchlist" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Watchlist</Link>
+            </DropdownMenuItem>
           </>
         )}
         <DropdownMenuSeparator />
