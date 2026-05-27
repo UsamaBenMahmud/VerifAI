@@ -32,8 +32,8 @@ const sideLinks = [
 function AdminPage() {
   const [tab, setTab] = useState("overview");
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid md:grid-cols-[220px_1fr] gap-6">
-      <aside className="glass rounded-xl p-3 h-fit md:sticky md:top-20">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid md:grid-cols-[220px_1fr] gap-6 pb-24 md:pb-8">
+      <aside className="hidden md:block glass rounded-xl p-3 h-fit md:sticky md:top-20">
         <div className="text-xs uppercase tracking-widest text-muted-foreground px-3 py-2">Admin</div>
         <ul className="space-y-1">
           {sideLinks.map(l => (
@@ -57,6 +57,18 @@ function AdminPage() {
         {tab === "apikeys" && <ApiKeysTab />}
         {tab === "settings" && <SettingsTab />}
       </section>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[color:var(--border)] bg-[color:var(--bg-deep)]/95 backdrop-blur">
+        <div className="flex overflow-x-auto no-scrollbar">
+          {sideLinks.map(l => (
+            <button key={l.id} onClick={() => setTab(l.id)} className={`flex flex-col items-center gap-0.5 px-3 py-2 min-w-[68px] text-[10px] shrink-0 transition ${tab === l.id ? "text-cyan" : "text-muted-foreground"}`}>
+              <l.icon className="h-4 w-4" />
+              <span className="truncate max-w-[64px]">{l.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
