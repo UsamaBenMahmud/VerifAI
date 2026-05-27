@@ -1,10 +1,13 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles } from "lucide-react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles, Link2, Camera, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
-import { analyze, bandFor, calibrateScore, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { analyze, bandFor, calibrateScore, isValidUrl, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 import { pushHistory } from "@/lib/localStore";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CameraRecorder } from "@/components/detect/CameraRecorder";
+
 
 export const Route = createFileRoute("/detect")({
   validateSearch: (s: Record<string, unknown>) => ({ url: typeof s.url === "string" ? s.url : undefined }),
@@ -43,7 +46,15 @@ function DetectPage() {
   const [showCompare, setShowCompare] = useState(false);
   const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(false);
+  const [inputTab, setInputTab] = useState<"upload" | "url" | "camera">("upload");
+  const [urlVal, setUrlVal] = useState("");
+  const [urlBusy, setUrlBusy] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareFiles, setCompareFiles] = useState<{ a: File | null; b: File | null }>({ a: null, b: null });
+  const [compareResults, setCompareResults] = useState<{ a: AnalysisResult | null; b: AnalysisResult | null } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const fromParam = search?.url;
@@ -57,7 +68,7 @@ function DetectPage() {
 
   const reset = () => {
     if (preview) URL.revokeObjectURL(preview);
-    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setError(null); setResult(null); setShowCompare(false);
+    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setError(null); setResult(null); setShowCompare(false); setCompareFiles({ a: null, b: null }); setCompareResults(null);
   };
 
   const startAnalysis = async (input: AnalyzeInput) => {
@@ -107,8 +118,55 @@ function DetectPage() {
     if (preview) URL.revokeObjectURL(preview);
     setFileMeta({ name: f.name, size: f.size, type: f.type });
     setPreview(URL.createObjectURL(f));
+    if (compareMode) {
+      const slot = !compareFiles.a ? "a" : !compareFiles.b ? "b" : "a";
+      setCompareFiles((c) => ({ ...c, [slot]: f }));
+      toast.success(`Loaded as ${slot === "a" ? "Original" : "Suspected"}`);
+      return;
+    }
     await startAnalysis({ kind: "video", file: f });
   };
+
+  const fetchUrl = async () => {
+    setError(null);
+    const u = urlVal.trim();
+    if (!isValidUrl(u)) { const m = "Enter a valid http(s) video URL."; setError(m); toast.error(m); return; }
+    setUrlBusy(true);
+    try {
+      const r = await fetch(u);
+      if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
+      const blob = await r.blob();
+      if (blob.size > MAX_BYTES) throw new Error("Remote file exceeds 200MB.");
+      const type = blob.type.startsWith("video/") ? blob.type : "video/mp4";
+      const name = u.split("/").pop()?.split("?")[0] || "remote-video.mp4";
+      const file = new File([blob], name, { type });
+      await handleFile(file);
+    } catch (e: any) {
+      const msg = e?.message?.includes("Failed to fetch") ? "Could not fetch URL (CORS or network). Download then upload instead." : e?.message || "URL fetch failed.";
+      setError(msg); toast.error(msg);
+    } finally { setUrlBusy(false); }
+  };
+
+  const runCompare = async () => {
+    if (!compareFiles.a || !compareFiles.b) { toast.error("Pick both Original and Suspected files."); return; }
+    setStage("analyzing"); setStep(0); setElapsed(0); setError(null);
+    const t0 = Date.now();
+    const ti = setInterval(() => setElapsed((Date.now() - t0) / 1000), 100);
+    const timers = [600, 1500, 3000, 5000, 7000].map((ms, i) => setTimeout(() => setStep(i + 1), ms));
+    try {
+      const [a, b] = await Promise.all([
+        analyze({ kind: "video", file: compareFiles.a }),
+        analyze({ kind: "video", file: compareFiles.b }),
+      ]);
+      setStep(5);
+      setCompareResults({ a, b });
+      setStage("results");
+      toast.success("Comparison complete");
+    } catch (e: any) {
+      setError(e?.message || "Compare failed"); toast.error(e?.message || "Compare failed"); setStage("idle");
+    } finally { timers.forEach(clearTimeout); clearInterval(ti); }
+  };
+
 
   const runDemo = async (kind: "fake" | "uncertain" | "authentic") => {
     setShowDemo(false);
@@ -173,18 +231,107 @@ function DetectPage() {
           <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-safe/15 border border-safe/40 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-safe">
             <span className="h-1.5 w-1.5 rounded-full bg-safe animate-pulse-dot" /> Live AI · HF EfficientNet-B0
           </div>
-          <div
-            onClick={() => fileInput.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
-            className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
-          >
-            <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
-            <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 200MB</p>
-            {prefillUrl && <p className="mt-3 text-xs text-cyan font-mono break-all">📎 Pre-filled URL: {prefillUrl}</p>}
-            <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+
+          <div className="mb-5 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => { setCompareMode(!compareMode); setCompareFiles({ a: null, b: null }); setCompareResults(null); }}
+              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition border ${compareMode ? "bg-violet/20 border-violet text-violet" : "border-violet/40 text-violet hover:bg-violet/10"}`}
+            >
+              <Layers className="h-3.5 w-3.5" /> {compareMode ? "Compare Mode: ON" : "Compare Two Files"}
+            </button>
+            {compareMode && <span className="text-xs text-muted-foreground">Upload an Original and a Suspected file to see them side-by-side.</span>}
           </div>
+
+          {!compareMode && (
+            <Tabs value={inputTab} onValueChange={(v) => setInputTab(v as any)}>
+              <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
+                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload</TabsTrigger>
+                <TabsTrigger value="url"><Link2 className="h-3.5 w-3.5 mr-1.5" />URL</TabsTrigger>
+                <TabsTrigger value="camera"><Camera className="h-3.5 w-3.5 mr-1.5" />Camera</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="upload">
+                <div
+                  onClick={() => fileInput.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+                  className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
+                >
+                  <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
+                  <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 200MB</p>
+                  {prefillUrl && <p className="mt-3 text-xs text-cyan font-mono break-all">📎 Pre-filled URL: {prefillUrl}</p>}
+                  <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="url">
+                <div className="border-2 border-dashed border-cyan/40 rounded-xl p-8">
+                  <label className="text-sm font-semibold flex items-center gap-2 mb-2"><Link2 className="h-4 w-4 text-cyan" /> Paste a public video URL</label>
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="url"
+                      value={urlVal}
+                      onChange={(e) => setUrlVal(e.target.value)}
+                      placeholder="https://example.com/video.mp4"
+                      className="flex-1 min-w-[240px] rounded-md bg-[color:var(--bg-surface)] border border-cyan/30 px-3 py-2 text-sm font-mono focus:outline-none focus:border-cyan"
+                    />
+                    <button onClick={fetchUrl} disabled={urlBusy} className="rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-bold glow-cyan disabled:opacity-50">
+                      {urlBusy ? "Fetching…" : "Fetch & Analyze"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Note: URL must allow CORS. Otherwise, download the file and use the Upload tab.</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="camera">
+                <div className="border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center">
+                  <Camera className="h-12 w-12 text-cyan mx-auto mb-4" />
+                  <p className="font-display text-xl">Record from your camera</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Front/back toggle · records up to 6s of video, then runs deepfake detection.</p>
+                  <button onClick={() => setShowCamera(true)} className="mt-5 inline-flex items-center gap-2 rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-bold glow-cyan">
+                    <Camera className="h-4 w-4" /> Open Camera
+                  </button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {compareMode && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {(["a", "b"] as const).map((slot) => {
+                const f = compareFiles[slot];
+                const label = slot === "a" ? "Original" : "Suspected";
+                return (
+                  <div key={slot}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); const dropped = e.dataTransfer.files?.[0]; if (dropped) { setCompareFiles((c) => ({ ...c, [slot]: dropped })); } }}
+                    className="border-2 border-dashed border-cyan/40 rounded-xl p-6 text-center"
+                  >
+                    <div className="text-xs uppercase tracking-widest text-cyan font-mono mb-2">{label}</div>
+                    {f ? (
+                      <div className="text-sm">
+                        <div className="font-semibold truncate">{f.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{(f.size/1024/1024).toFixed(2)} MB</div>
+                        <button onClick={() => setCompareFiles((c) => ({ ...c, [slot]: null }))} className="mt-3 text-xs text-danger hover:underline">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block py-6">
+                        <Upload className="h-8 w-8 text-cyan mx-auto mb-2" />
+                        <span className="text-sm">Drop or click to choose</span>
+                        <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setCompareFiles((c) => ({ ...c, [slot]: file })); }} />
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="md:col-span-2 flex justify-center">
+                <button onClick={runCompare} disabled={!compareFiles.a || !compareFiles.b} className="rounded-md bg-cyan text-[color:var(--bg-deep)] px-5 py-2.5 text-sm font-bold glow-cyan disabled:opacity-40">
+                  <Beaker className="h-4 w-4 inline mr-1.5" /> Run Comparison
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger flex items-center gap-2">
@@ -192,7 +339,7 @@ function DetectPage() {
             </div>
           )}
 
-          {fileMeta && (
+          {fileMeta && !compareMode && (
             <div className="mt-4 flex items-center gap-3 rounded-md border border-cyan/30 bg-cyan/5 p-3">
               {preview && <video src={preview} className="h-12 w-20 rounded object-cover bg-black" muted />}
               <div className="flex-1 min-w-0">
@@ -204,8 +351,11 @@ function DetectPage() {
           )}
 
           <p className="mt-4 text-xs text-muted-foreground text-center">🔒 {t("Your upload is encrypted and auto-deleted in 24 hours.", "আপনার আপলোড এনক্রিপ্টেড এবং ২৪ ঘণ্টায় স্বয়ংক্রিয়ভাবে মুছে যাবে।", lang)}</p>
+
+          {showCamera && <CameraRecorder onClose={() => setShowCamera(false)} onRecorded={(file) => { setShowCamera(false); handleFile(file); }} />}
         </div>
       )}
+
 
       {stage === "analyzing" && (
         <div className="glass rounded-2xl p-8">
@@ -229,7 +379,8 @@ function DetectPage() {
         </div>
       )}
 
-      {stage === "results" && result && <Results result={result} lang={lang} preview={preview} onReset={reset} showAbout={showAbout} setShowAbout={setShowAbout} showEvidence={showEvidence} setShowEvidence={setShowEvidence} showCompare={showCompare} setShowCompare={setShowCompare} />}
+      {stage === "results" && compareResults?.a && compareResults?.b && <CompareResults a={compareResults.a} b={compareResults.b} onReset={reset} lang={lang} />}
+      {stage === "results" && !compareResults && result && <Results result={result} lang={lang} preview={preview} onReset={reset} showAbout={showAbout} setShowAbout={setShowAbout} showEvidence={showEvidence} setShowEvidence={setShowEvidence} showCompare={showCompare} setShowCompare={setShowCompare} />}
     </div>
   );
 }
@@ -505,6 +656,49 @@ function DemoModal({ onClose, onRun }: { onClose: () => void; onRun: (k: "fake" 
           ))}
         </div>
         <p className="mt-5 text-xs text-muted-foreground text-center">Demo mode uses pre-loaded examples for reliable demonstration. Real uploads use your HuggingFace model.</p>
+      </div>
+    </div>
+  );
+}
+
+function CompareResults({ a, b, onReset, lang }: { a: AnalysisResult; b: AnalysisResult; onReset: () => void; lang: any }) {
+  const delta = Math.abs(a.score - b.score);
+  const similar = delta <= 12;
+  const bandA = bandFor(a.score);
+  const bandB = bandFor(b.score);
+  return (
+    <div className="space-y-6">
+      <div className={`glass rounded-2xl p-5 border ${similar ? "border-warning/50" : "border-cyan/40"}`}>
+        <div className="flex items-center gap-3">
+          <Layers className={`h-6 w-6 ${similar ? "text-warning" : "text-cyan"}`} />
+          <div>
+            <div className="font-display text-lg font-bold">
+              {similar ? "High similarity — likely manipulated copy" : "Different sources / strong divergence"}
+            </div>
+            <div className="text-xs text-muted-foreground font-mono mt-1">
+              Score Δ = {delta} · Original {a.score}/100 · Suspected {b.score}/100
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        {[{ label: "Original", r: a, band: bandA }, { label: "Suspected", r: b, band: bandB }].map((s) => (
+          <div key={s.label} className="glass rounded-2xl p-6">
+            <div className="text-xs uppercase tracking-widest font-mono text-cyan mb-2">{s.label}</div>
+            <div className="font-display text-5xl font-bold" style={{ color: s.band.color }}>{s.r.score}<span className="text-base text-muted-foreground font-normal">/100</span></div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: s.band.color }}>{t(s.band.en, s.band.bn, lang)}</div>
+            <div className="mt-3 text-xs font-mono text-muted-foreground">Confidence {s.r.confidence.toFixed(1)}% ± {s.r.confidenceMargin.toFixed(1)}%</div>
+            <div className="mt-4 space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Vision</span><span className="font-mono">{s.r.subScores.vision}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Metadata</span><span className="font-mono">{s.r.subScores.metadata}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Knowledge</span><span className="font-mono">{s.r.subScores.knowledge}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Audio sync</span><span className="font-mono">{s.r.subScores.audio || "—"}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-center pt-2">
+        <button onClick={onReset} className="text-sm text-cyan hover:underline">← Analyze another</button>
       </div>
     </div>
   );
