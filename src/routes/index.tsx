@@ -112,26 +112,49 @@ function Home() {
         ))}
       </section>
 
-      {/* HOW IT WORKS */}
+      {/* PROBLEM */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="text-center">
+          <span className="inline-block text-xs font-mono uppercase tracking-widest text-danger border border-danger/40 rounded px-3 py-1">The Problem</span>
+          <h2 className="mt-4 font-display text-3xl sm:text-4xl font-bold">Bangla deepfakes spread faster than fact-checkers can debunk them</h2>
+          <p className="mt-2 text-cyan/90 font-bangla text-lg">বাংলা ডিপফেক ছড়িয়ে পড়ে — সত্য যাচাই হওয়ার আগেই</p>
+        </div>
+        <div className="mt-8 grid md:grid-cols-3 gap-4">
+          {[
+            { stat: "30s", h: "to fabricate a face", p: "Open-source GAN tools now generate convincing synthetic faces in under a minute, on a laptop." },
+            { stat: "3 days", h: "average debunk time", p: "Newsroom fact-checks lag behind the viral curve — by the time the correction lands, the damage is done." },
+            { stat: "0 tools", h: "built for Bangla", p: "Every major deepfake detector ships English-only. Bangladeshi journalists and citizens have no native option." },
+          ].map((c) => (
+            <div key={c.h} className="glass rounded-xl p-6">
+              <div className="font-display text-4xl font-bold text-danger">{c.stat}</div>
+              <h3 className="mt-2 font-display font-semibold">{c.h}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{c.p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HOW IT WORKS — honest 3-step pipeline */}
       <section className="mx-auto max-w-7xl px-6 py-16">
         <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">How It Works</h2>
-        <p className="mt-2 text-center text-muted-foreground">Four agents. One trust score. Six seconds.</p>
+        <p className="mt-2 text-center text-muted-foreground">ML deepfake detector + LLM forensic explainer. Bilingual output. Under 6 seconds.</p>
         <div className="mt-10 grid md:grid-cols-4 gap-4 relative">
           {[
-            { icon: UploadIcon, title: "Upload", desc: "Video, image, or URL" },
-            { icon: Brain, title: "4 AI Agents", desc: "Parallel analysis" },
-            { icon: ChartBar, title: "Trust Score", desc: "0–100 with confidence" },
-            { icon: Languages, title: "Explain", desc: "Bangla + English" },
+            { icon: UploadIcon, title: "Input", desc: "Video upload, URL, or live camera capture" },
+            { icon: Brain, title: "EfficientNet-B2", desc: "Vision model trained on FaceForensics++ + Celeb-DF v2 returns fake/real probability" },
+            { icon: Bot, title: "Gemini Explainer", desc: "LLM converts the score into bilingual verdict + risk factors" },
+            { icon: Languages, title: "Verdict", desc: "Trust score 0–100, confidence interval, Bangla + English explanation" },
           ].map((step, i) => (
             <div key={step.title} className="glass rounded-xl p-6 relative">
               <div className="absolute -top-3 left-4 font-mono text-xs px-2 py-0.5 rounded bg-cyan text-[color:var(--bg-deep)] font-bold">0{i + 1}</div>
               <step.icon className="h-7 w-7 text-cyan mb-3" />
               <h3 className="font-display font-semibold">{step.title}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{step.desc}</p>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
             </div>
           ))}
         </div>
       </section>
+
 
       {/* WHO IT'S FOR */}
       <section className="mx-auto max-w-7xl px-6 py-16">
