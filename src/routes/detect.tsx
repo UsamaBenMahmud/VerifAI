@@ -68,7 +68,7 @@ function DetectPage() {
 
   const reset = () => {
     if (preview) URL.revokeObjectURL(preview);
-    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setError(null); setResult(null); setShowCompare(false);
+    setStage("idle"); setStep(0); setElapsed(0); setPreview(null); setFileMeta(null); setError(null); setResult(null); setShowCompare(false); setCompareFiles({ a: null, b: null }); setCompareResults(null);
   };
 
   const startAnalysis = async (input: AnalyzeInput) => {
