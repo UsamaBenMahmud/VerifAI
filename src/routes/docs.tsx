@@ -74,6 +74,8 @@ function Presentation() {
   const [meta, setMeta] = useState<import("@/lib/localStore").PresentationMeta | null>(null);
   const [slides, setSlides] = useState(8);
   const [active, setActive] = useState(1);
+  const [thumbs, setThumbs] = useState<string[]>([]);
+  const [thumbStatus, setThumbStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
     import("@/lib/localStore").then((m) => {
@@ -81,6 +83,44 @@ function Presentation() {
       setData(p.data); setMeta(p.meta); setSlides(p.slides);
     });
   }, []);
+
+  // Render real per-page thumbnails for PDFs using pdf.js.
+  useEffect(() => {
+    if (!data || meta?.fileType !== "pdf") return;
+    let cancelled = false;
+    setThumbStatus("loading");
+    (async () => {
+      try {
+        const pdfjs: any = await import("pdfjs-dist");
+        // Wire the worker (Vite-friendly URL import).
+        const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+        const doc = await pdfjs.getDocument({ url: data }).promise;
+        if (cancelled) return;
+        setSlides(doc.numPages);
+
+        const out: string[] = [];
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const viewport = page.getViewport({ scale: 0.35 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d")!;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          out.push(canvas.toDataURL("image/jpeg", 0.75));
+          if (cancelled) return;
+          setThumbs([...out]);
+        }
+        if (!cancelled) setThumbStatus("ready");
+      } catch (e) {
+        console.error("[pdf-thumbs] failed", e);
+        if (!cancelled) setThumbStatus("error");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [data, meta?.fileType]);
 
   const download = () => {
     if (!data || !meta) return;
@@ -95,7 +135,6 @@ function Presentation() {
 
   const isPdf = meta?.fileType === "pdf";
   const isPptx = meta?.fileType === "pptx";
-  // Microsoft Office Online viewer — renders public .pptx URLs inline as slides.
   const officeViewerSrc = data && isPptx
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data)}`
     : null;
@@ -117,12 +156,7 @@ function Presentation() {
           isPdf ? (
             <iframe src={`${data}#page=${active}`} title={meta.filename} className="w-full h-[70vh] rounded-lg bg-black" />
           ) : isPptx && officeViewerSrc ? (
-            <iframe
-              src={officeViewerSrc}
-              title={meta.filename}
-              className="w-full h-[70vh] rounded-lg bg-black"
-              allowFullScreen
-            />
+            <iframe src={officeViewerSrc} title={meta.filename} className="w-full h-[70vh] rounded-lg bg-black" allowFullScreen />
           ) : (
             <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex flex-col items-center justify-center text-center p-6">
               <FileText className="h-12 w-12 text-cyan mb-3" />
@@ -139,31 +173,42 @@ function Presentation() {
             </div>
           </div>
         )}
-        {isPptx && meta && (
-          <div className="mt-2 text-[11px] text-muted-foreground text-center">
-            Live preview via Microsoft Office viewer · {(meta.size / 1024 / 1024).toFixed(2)} MB · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}
-          </div>
-        )}
       </div>
 
       {(isPdf || isPptx) && (
         <>
-          <h3 className="font-display text-lg font-semibold mb-3">All slides</h3>
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="font-display text-lg font-semibold">All slides</h3>
+            {isPdf && thumbStatus === "loading" && <span className="text-xs text-muted-foreground">Rendering slide previews… {thumbs.length}/{slides}</span>}
+            {isPdf && thumbStatus === "error" && <span className="text-xs text-danger">Couldn't render previews — using numbered cards.</span>}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: slides }).map((_, i) => {
               const n = i + 1;
+              const thumb = thumbs[i];
               return (
-                <button key={n} onClick={() => { setActive(n); document.getElementById("deck-viewer")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-                  className={`glass rounded-lg aspect-video p-3 flex flex-col justify-between hover:border-cyan/60 transition text-left bg-gradient-to-br ${gradients[i % gradients.length]} ${active === n ? "ring-2 ring-cyan glow-cyan" : ""}`}>
-                  <div className="font-mono text-[10px] text-cyan">SLIDE {String(n).padStart(2, "0")}</div>
-                  <div className="self-end font-display text-2xl font-bold">{n}</div>
+                <button
+                  key={n}
+                  onClick={() => { setActive(n); document.getElementById("deck-viewer")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                  className={`glass rounded-lg overflow-hidden hover:border-cyan/60 transition text-left ${active === n ? "ring-2 ring-cyan glow-cyan" : ""}`}
+                >
+                  <div className={`aspect-video relative bg-gradient-to-br ${gradients[i % gradients.length]} flex items-center justify-center`}>
+                    {thumb ? (
+                      <img src={thumb} alt={`Slide ${n}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="font-display text-3xl font-bold opacity-60">{n}</div>
+                    )}
+                    <div className="absolute top-2 left-2 font-mono text-[10px] text-cyan bg-[color:var(--bg-deep)]/70 px-2 py-0.5 rounded">SLIDE {String(n).padStart(2, "0")}</div>
+                  </div>
                 </button>
               );
             })}
           </div>
+
           {isPptx && (
             <p className="mt-3 text-xs text-muted-foreground">
-              Tip: use the Office viewer's own controls above to step through real slides. The cards below are quick reference.
+              Tip: PowerPoint slide thumbnails can't be rendered in-browser. Upload the deck as a PDF in Admin → Presentation to get real per-slide previews here. The main viewer above still shows live slides via Microsoft Office.
             </p>
           )}
         </>
@@ -171,6 +216,7 @@ function Presentation() {
     </div>
   );
 }
+
 
 
 function PRD() {
