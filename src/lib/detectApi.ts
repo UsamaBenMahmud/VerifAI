@@ -48,6 +48,18 @@ function severityFor(score: number): Severity {
   return score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW";
 }
 
+export function calibrateScore(rawScore: number, fakeProbability?: number | null): number {
+  if (fakeProbability != null && !Number.isNaN(Number(fakeProbability))) {
+    return Math.max(0, Math.min(100, Math.round((1 - Number(fakeProbability)) * 100)));
+  }
+  if (rawScore >= 45 && rawScore <= 65) {
+    if (rawScore < 53) return Math.max(15, rawScore - 30);
+    if (rawScore > 53) return Math.min(85, rawScore + 25);
+    return 50;
+  }
+  return rawScore;
+}
+
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
   if (input.kind !== "video") {
     throw new Error("Only video uploads are supported.");
