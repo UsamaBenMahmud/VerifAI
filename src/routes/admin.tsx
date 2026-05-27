@@ -32,8 +32,8 @@ const sideLinks = [
 function AdminPage() {
   const [tab, setTab] = useState("overview");
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid md:grid-cols-[220px_1fr] gap-6">
-      <aside className="glass rounded-xl p-3 h-fit md:sticky md:top-20">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid md:grid-cols-[220px_1fr] gap-6 pb-24 md:pb-8">
+      <aside className="hidden md:block glass rounded-xl p-3 h-fit md:sticky md:top-20">
         <div className="text-xs uppercase tracking-widest text-muted-foreground px-3 py-2">Admin</div>
         <ul className="space-y-1">
           {sideLinks.map(l => (
