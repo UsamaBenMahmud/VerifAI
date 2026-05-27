@@ -87,8 +87,10 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      router.invalidate();
-      queryClient.invalidateQueries();
+      window.setTimeout(() => {
+        void router.invalidate();
+        void queryClient.invalidateQueries();
+      }, 0);
     });
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);
