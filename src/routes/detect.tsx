@@ -169,7 +169,10 @@ function DetectPage() {
       </div>
 
       {stage === "idle" && (
-        <div className="glass rounded-2xl p-6 sm:p-8">
+        <div className="glass rounded-2xl p-6 sm:p-8 relative">
+          <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-safe/15 border border-safe/40 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-safe">
+            <span className="h-1.5 w-1.5 rounded-full bg-safe animate-pulse-dot" /> Live AI · HF EfficientNet-B0
+          </div>
           <div
             onClick={() => fileInput.current?.click()}
             onDragOver={(e) => e.preventDefault()}
