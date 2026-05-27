@@ -379,7 +379,8 @@ function DetectPage() {
         </div>
       )}
 
-      {stage === "results" && result && <Results result={result} lang={lang} preview={preview} onReset={reset} showAbout={showAbout} setShowAbout={setShowAbout} showEvidence={showEvidence} setShowEvidence={setShowEvidence} showCompare={showCompare} setShowCompare={setShowCompare} />}
+      {stage === "results" && compareResults?.a && compareResults?.b && <CompareResults a={compareResults.a} b={compareResults.b} onReset={reset} lang={lang} />}
+      {stage === "results" && !compareResults && result && <Results result={result} lang={lang} preview={preview} onReset={reset} showAbout={showAbout} setShowAbout={setShowAbout} showEvidence={showEvidence} setShowEvidence={setShowEvidence} showCompare={showCompare} setShowCompare={setShowCompare} />}
     </div>
   );
 }
