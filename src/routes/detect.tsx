@@ -149,8 +149,18 @@ function DetectPage() {
     toast.success(`Demo: ${p.vEn}`);
   };
 
+  return (
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 relative">
+      {/* Floating Demo button */}
+      <button
+        onClick={() => setShowDemo(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-cyan text-[color:var(--bg-deep)] px-5 py-3 text-sm font-bold glow-cyan-strong hover:scale-105 transition"
+      >
+        <Play className="h-4 w-4" /> 🎬 Demo Mode
+      </button>
 
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+      {showDemo && <DemoModal onClose={() => setShowDemo(false)} onRun={runDemo} />}
+
       <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
         <div>
           <h1 className="font-display text-3xl sm:text-4xl font-bold">{t("Analyze Video", "ভিডিও বিশ্লেষণ", lang)}</h1>
