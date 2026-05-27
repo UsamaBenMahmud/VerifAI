@@ -1,11 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
 import { analyze, bandFor, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { pushHistory } from "@/lib/localStore";
 
 export const Route = createFileRoute("/detect")({
+  validateSearch: (s: Record<string, unknown>) => ({ url: typeof s.url === "string" ? s.url : undefined }),
   head: () => ({ meta: [
     { title: "Detect — VerifAI" },
     { name: "description", content: "Upload a video and get a deepfake trust score in seconds." },
@@ -28,6 +30,7 @@ const STEPS = [
 
 function DetectPage() {
   const { lang } = useLang();
+  const search = useSearch({ from: "/detect" });
   const [stage, setStage] = useState<Stage>("idle");
   const [step, setStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -38,7 +41,18 @@ function DetectPage() {
   const [showAbout, setShowAbout] = useState(false);
   const [showEvidence, setShowEvidence] = useState(true);
   const [showCompare, setShowCompare] = useState(false);
+  const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fromParam = search?.url;
+    const pending = typeof window !== "undefined" ? localStorage.getItem("verifai_pending_url") : null;
+    const u = fromParam || pending;
+    if (u) {
+      setPrefillUrl(u);
+      if (pending && typeof window !== "undefined") localStorage.removeItem("verifai_pending_url");
+    }
+  }, [search?.url]);
 
   const reset = () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -59,6 +73,18 @@ function DetectPage() {
       await new Promise(r => setTimeout(r, 300));
       setResult(res);
       setStage("results");
+      // Save to history
+      try {
+        pushHistory({
+          id: `VAI-${Date.now()}`,
+          ts: Date.now(),
+          score: res.score,
+          verdict_en: res.riskFactors[0]?.titleEn || `Trust ${res.score}/100`,
+          verdict_bn: res.riskFactors[0]?.titleBn || `ট্রাস্ট ${res.score}/১০০`,
+          filename: input.kind === "video" ? input.file.name : null,
+          url: null,
+        });
+      } catch { /* ignore */ }
       toast.success("Analysis complete");
     } catch (e: any) {
       const msg = e?.name === "HfSleepingError" || e?.isSleeping
@@ -75,7 +101,7 @@ function DetectPage() {
 
   const handleFile = async (f: File) => {
     setError(null);
-    if (f.size > MAX_BYTES) { const m = "File too large. Max 50MB."; setError(m); toast.error(m); return; }
+    if (f.size > MAX_BYTES) { const m = "File too large. Max 200MB."; setError(m); toast.error(m); return; }
     if (!f.type.startsWith("video/")) { const m = "Only video files are supported (MP4, MOV, WebM)."; setError(m); toast.error(m); return; }
     if (preview) URL.revokeObjectURL(preview);
     setFileMeta({ name: f.name, size: f.size, type: f.type });
@@ -102,7 +128,8 @@ function DetectPage() {
           >
             <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
             <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 50MB</p>
+            <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 200MB</p>
+            {prefillUrl && <p className="mt-3 text-xs text-cyan font-mono break-all">📎 Pre-filled URL: {prefillUrl}</p>}
             <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
           </div>
 
