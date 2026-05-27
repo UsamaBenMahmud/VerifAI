@@ -118,8 +118,55 @@ function DetectPage() {
     if (preview) URL.revokeObjectURL(preview);
     setFileMeta({ name: f.name, size: f.size, type: f.type });
     setPreview(URL.createObjectURL(f));
+    if (compareMode) {
+      const slot = !compareFiles.a ? "a" : !compareFiles.b ? "b" : "a";
+      setCompareFiles((c) => ({ ...c, [slot]: f }));
+      toast.success(`Loaded as ${slot === "a" ? "Original" : "Suspected"}`);
+      return;
+    }
     await startAnalysis({ kind: "video", file: f });
   };
+
+  const fetchUrl = async () => {
+    setError(null);
+    const u = urlVal.trim();
+    if (!isValidUrl(u)) { const m = "Enter a valid http(s) video URL."; setError(m); toast.error(m); return; }
+    setUrlBusy(true);
+    try {
+      const r = await fetch(u);
+      if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
+      const blob = await r.blob();
+      if (blob.size > MAX_BYTES) throw new Error("Remote file exceeds 200MB.");
+      const type = blob.type.startsWith("video/") ? blob.type : "video/mp4";
+      const name = u.split("/").pop()?.split("?")[0] || "remote-video.mp4";
+      const file = new File([blob], name, { type });
+      await handleFile(file);
+    } catch (e: any) {
+      const msg = e?.message?.includes("Failed to fetch") ? "Could not fetch URL (CORS or network). Download then upload instead." : e?.message || "URL fetch failed.";
+      setError(msg); toast.error(msg);
+    } finally { setUrlBusy(false); }
+  };
+
+  const runCompare = async () => {
+    if (!compareFiles.a || !compareFiles.b) { toast.error("Pick both Original and Suspected files."); return; }
+    setStage("analyzing"); setStep(0); setElapsed(0); setError(null);
+    const t0 = Date.now();
+    const ti = setInterval(() => setElapsed((Date.now() - t0) / 1000), 100);
+    const timers = [600, 1500, 3000, 5000, 7000].map((ms, i) => setTimeout(() => setStep(i + 1), ms));
+    try {
+      const [a, b] = await Promise.all([
+        analyze({ kind: "video", file: compareFiles.a }),
+        analyze({ kind: "video", file: compareFiles.b }),
+      ]);
+      setStep(5);
+      setCompareResults({ a, b });
+      setStage("results");
+      toast.success("Comparison complete");
+    } catch (e: any) {
+      setError(e?.message || "Compare failed"); toast.error(e?.message || "Compare failed"); setStage("idle");
+    } finally { timers.forEach(clearTimeout); clearInterval(ti); }
+  };
+
 
   const runDemo = async (kind: "fake" | "uncertain" | "authentic") => {
     setShowDemo(false);
