@@ -8,9 +8,9 @@ export function LiveStatsBar() {
     const id = setInterval(() => setStats(bumpAndGetLiveStats()), 5000);
     return () => clearInterval(id);
   }, []);
-  const scans = useCountUp(stats.scans);
-  const detected = useCountUp(stats.detected);
-  const users = useCountUp(stats.users);
+  const scans = useCountUp(stats.analyses);
+  const detected = useCountUp(stats.deepfakes);
+  const users = useCountUp(stats.citizens);
   return (
     <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
       <Stat label="Scans" value={scans} />
