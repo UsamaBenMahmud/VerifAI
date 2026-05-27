@@ -42,6 +42,7 @@ function DetectPage() {
   const [showEvidence, setShowEvidence] = useState(true);
   const [showCompare, setShowCompare] = useState(false);
   const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
+  const [showDemo, setShowDemo] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
