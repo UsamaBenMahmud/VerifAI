@@ -1,10 +1,13 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles } from "lucide-react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles, Link2, Camera, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
-import { analyze, bandFor, calibrateScore, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { analyze, bandFor, calibrateScore, isValidUrl, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 import { pushHistory } from "@/lib/localStore";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CameraRecorder } from "@/components/detect/CameraRecorder";
+
 
 export const Route = createFileRoute("/detect")({
   validateSearch: (s: Record<string, unknown>) => ({ url: typeof s.url === "string" ? s.url : undefined }),
