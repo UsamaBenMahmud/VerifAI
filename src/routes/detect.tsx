@@ -231,18 +231,107 @@ function DetectPage() {
           <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-safe/15 border border-safe/40 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-safe">
             <span className="h-1.5 w-1.5 rounded-full bg-safe animate-pulse-dot" /> Live AI · HF EfficientNet-B0
           </div>
-          <div
-            onClick={() => fileInput.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
-            className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
-          >
-            <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
-            <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 200MB</p>
-            {prefillUrl && <p className="mt-3 text-xs text-cyan font-mono break-all">📎 Pre-filled URL: {prefillUrl}</p>}
-            <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+
+          <div className="mb-5 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => { setCompareMode(!compareMode); setCompareFiles({ a: null, b: null }); setCompareResults(null); }}
+              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition border ${compareMode ? "bg-violet/20 border-violet text-violet" : "border-violet/40 text-violet hover:bg-violet/10"}`}
+            >
+              <Layers className="h-3.5 w-3.5" /> {compareMode ? "Compare Mode: ON" : "Compare Two Files"}
+            </button>
+            {compareMode && <span className="text-xs text-muted-foreground">Upload an Original and a Suspected file to see them side-by-side.</span>}
           </div>
+
+          {!compareMode && (
+            <Tabs value={inputTab} onValueChange={(v) => setInputTab(v as any)}>
+              <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
+                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload</TabsTrigger>
+                <TabsTrigger value="url"><Link2 className="h-3.5 w-3.5 mr-1.5" />URL</TabsTrigger>
+                <TabsTrigger value="camera"><Camera className="h-3.5 w-3.5 mr-1.5" />Camera</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="upload">
+                <div
+                  onClick={() => fileInput.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+                  className="cursor-pointer border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center hover:border-cyan hover:bg-cyan/5 transition group"
+                >
+                  <Upload className="h-12 w-12 text-cyan mx-auto mb-4 group-hover:scale-110 transition" />
+                  <p className="font-display text-xl">{t("Drop a video here", "ভিডিও এখানে রাখুন", lang)}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">MP4 · MOV · WebM · max 200MB</p>
+                  {prefillUrl && <p className="mt-3 text-xs text-cyan font-mono break-all">📎 Pre-filled URL: {prefillUrl}</p>}
+                  <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="url">
+                <div className="border-2 border-dashed border-cyan/40 rounded-xl p-8">
+                  <label className="text-sm font-semibold flex items-center gap-2 mb-2"><Link2 className="h-4 w-4 text-cyan" /> Paste a public video URL</label>
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="url"
+                      value={urlVal}
+                      onChange={(e) => setUrlVal(e.target.value)}
+                      placeholder="https://example.com/video.mp4"
+                      className="flex-1 min-w-[240px] rounded-md bg-[color:var(--bg-surface)] border border-cyan/30 px-3 py-2 text-sm font-mono focus:outline-none focus:border-cyan"
+                    />
+                    <button onClick={fetchUrl} disabled={urlBusy} className="rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-bold glow-cyan disabled:opacity-50">
+                      {urlBusy ? "Fetching…" : "Fetch & Analyze"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Note: URL must allow CORS. Otherwise, download the file and use the Upload tab.</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="camera">
+                <div className="border-2 border-dashed border-cyan/40 rounded-xl p-10 text-center">
+                  <Camera className="h-12 w-12 text-cyan mx-auto mb-4" />
+                  <p className="font-display text-xl">Record from your camera</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Front/back toggle · records up to 6s of video, then runs deepfake detection.</p>
+                  <button onClick={() => setShowCamera(true)} className="mt-5 inline-flex items-center gap-2 rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-bold glow-cyan">
+                    <Camera className="h-4 w-4" /> Open Camera
+                  </button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {compareMode && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {(["a", "b"] as const).map((slot) => {
+                const f = compareFiles[slot];
+                const label = slot === "a" ? "Original" : "Suspected";
+                return (
+                  <div key={slot}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); const dropped = e.dataTransfer.files?.[0]; if (dropped) { setCompareFiles((c) => ({ ...c, [slot]: dropped })); } }}
+                    className="border-2 border-dashed border-cyan/40 rounded-xl p-6 text-center"
+                  >
+                    <div className="text-xs uppercase tracking-widest text-cyan font-mono mb-2">{label}</div>
+                    {f ? (
+                      <div className="text-sm">
+                        <div className="font-semibold truncate">{f.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{(f.size/1024/1024).toFixed(2)} MB</div>
+                        <button onClick={() => setCompareFiles((c) => ({ ...c, [slot]: null }))} className="mt-3 text-xs text-danger hover:underline">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block py-6">
+                        <Upload className="h-8 w-8 text-cyan mx-auto mb-2" />
+                        <span className="text-sm">Drop or click to choose</span>
+                        <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) setCompareFiles((c) => ({ ...c, [slot]: file })); }} />
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="md:col-span-2 flex justify-center">
+                <button onClick={runCompare} disabled={!compareFiles.a || !compareFiles.b} className="rounded-md bg-cyan text-[color:var(--bg-deep)] px-5 py-2.5 text-sm font-bold glow-cyan disabled:opacity-40">
+                  <Beaker className="h-4 w-4 inline mr-1.5" /> Run Comparison
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger flex items-center gap-2">
@@ -250,7 +339,7 @@ function DetectPage() {
             </div>
           )}
 
-          {fileMeta && (
+          {fileMeta && !compareMode && (
             <div className="mt-4 flex items-center gap-3 rounded-md border border-cyan/30 bg-cyan/5 p-3">
               {preview && <video src={preview} className="h-12 w-20 rounded object-cover bg-black" muted />}
               <div className="flex-1 min-w-0">
@@ -262,8 +351,11 @@ function DetectPage() {
           )}
 
           <p className="mt-4 text-xs text-muted-foreground text-center">🔒 {t("Your upload is encrypted and auto-deleted in 24 hours.", "আপনার আপলোড এনক্রিপ্টেড এবং ২৪ ঘণ্টায় স্বয়ংক্রিয়ভাবে মুছে যাবে।", lang)}</p>
+
+          {showCamera && <CameraRecorder onClose={() => setShowCamera(false)} onRecorded={(file) => { setShowCamera(false); handleFile(file); }} />}
         </div>
       )}
+
 
       {stage === "analyzing" && (
         <div className="glass rounded-2xl p-8">
