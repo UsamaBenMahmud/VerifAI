@@ -475,3 +475,34 @@ function TrustGauge({ score, color }: { score: number; color: string }) {
     </div>
   );
 }
+
+function DemoModal({ onClose, onRun }: { onClose: () => void; onRun: (k: "fake" | "uncertain" | "authentic") => void }) {
+  const cases = [
+    { k: "fake" as const, emoji: "🔴", title: "Known Deepfake", label: "AI-generated face (GAN)", expected: "Score ~12/100 — Likely Deepfake", color: "danger" },
+    { k: "uncertain" as const, emoji: "🟡", title: "Uncertain Case", label: "Low quality — hard to determine", expected: "Score ~47/100 — Uncertain", color: "warning" },
+    { k: "authentic" as const, emoji: "🟢", title: "Authentic Photo", label: "Real photograph (stock)", expected: "Score ~82/100 — Likely Authentic", color: "safe" },
+  ];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="glass-strong rounded-2xl p-6 w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-display text-xl font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-cyan" /> Live Demo — 3 Test Cases</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5">Use these pre-loaded examples to demonstrate VerifAI.</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {cases.map((c) => (
+            <div key={c.k} className={`glass rounded-xl p-4 border border-${c.color}/30 flex flex-col`}>
+              <div className="text-3xl mb-2">{c.emoji}</div>
+              <div className="font-display font-bold">{c.title}</div>
+              <div className="text-xs text-muted-foreground mt-1">{c.label}</div>
+              <div className={`text-xs mt-2 text-${c.color} font-mono`}>{c.expected}</div>
+              <button onClick={() => onRun(c.k)} className="mt-3 rounded-md bg-cyan text-[color:var(--bg-deep)] px-3 py-2 text-xs font-semibold glow-cyan">Run This Demo</button>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-xs text-muted-foreground text-center">Demo mode uses pre-loaded examples for reliable demonstration. Real uploads use your HuggingFace model.</p>
+      </div>
+    </div>
+  );
+}
