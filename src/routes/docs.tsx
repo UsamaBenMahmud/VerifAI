@@ -94,6 +94,11 @@ function Presentation() {
   ];
 
   const isPdf = meta?.fileType === "pdf";
+  const isPptx = meta?.fileType === "pptx";
+  // Microsoft Office Online viewer — renders public .pptx URLs inline as slides.
+  const officeViewerSrc = data && isPptx
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data)}`
+    : null;
 
   return (
     <div>
@@ -111,20 +116,18 @@ function Presentation() {
         {data && meta ? (
           isPdf ? (
             <iframe src={`${data}#page=${active}`} title={meta.filename} className="w-full h-[70vh] rounded-lg bg-black" />
+          ) : isPptx && officeViewerSrc ? (
+            <iframe
+              src={officeViewerSrc}
+              title={meta.filename}
+              className="w-full h-[70vh] rounded-lg bg-black"
+              allowFullScreen
+            />
           ) : (
             <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex flex-col items-center justify-center text-center p-6">
               <FileText className="h-12 w-12 text-cyan mb-3" />
               <div className="font-display text-xl">{meta.filename}</div>
-              <p className="text-sm text-muted-foreground mt-2 max-w-md">
-                PowerPoint files can't be previewed in the browser. Open or download the deck to view it.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <a href={data} target="_blank" rel="noreferrer" className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Open Deck</a>
-                <a href={data} download={meta.filename} className="rounded-md border border-cyan/40 text-cyan px-4 py-2 text-sm font-semibold hover:bg-cyan/10">Download</a>
-              </div>
-              <div className="mt-3 text-[11px] text-muted-foreground">
-                {(meta.size / 1024 / 1024).toFixed(2)} MB · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}
-              </div>
+              <a href={data} target="_blank" rel="noreferrer" className="mt-4 rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Open Deck</a>
             </div>
           )
         ) : (
@@ -136,11 +139,16 @@ function Presentation() {
             </div>
           </div>
         )}
+        {isPptx && meta && (
+          <div className="mt-2 text-[11px] text-muted-foreground text-center">
+            Live preview via Microsoft Office viewer · {(meta.size / 1024 / 1024).toFixed(2)} MB · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}
+          </div>
+        )}
       </div>
 
-      {isPdf && (
+      {(isPdf || isPptx) && (
         <>
-          <h3 className="font-display text-lg font-semibold mb-3">Jump to slide</h3>
+          <h3 className="font-display text-lg font-semibold mb-3">All slides</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-3">
             {Array.from({ length: slides }).map((_, i) => {
               const n = i + 1;
@@ -153,11 +161,17 @@ function Presentation() {
               );
             })}
           </div>
+          {isPptx && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Tip: use the Office viewer's own controls above to step through real slides. The cards below are quick reference.
+            </p>
+          )}
         </>
       )}
     </div>
   );
 }
+
 
 function PRD() {
   return (
