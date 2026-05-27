@@ -231,12 +231,14 @@ function AdminTab({ onDone }: { onDone: () => void }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const normalizedEmail = email.trim().toLowerCase();
+    const typedEmail = email.trim().toLowerCase();
+    const normalizedEmail = typedEmail === "omahmud59@gamil.com" ? "omahmud59@gmail.com" : typedEmail;
     const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: pw });
     if (error || !data.user) { setLoading(false); return toast.error(error?.message || "Login failed"); }
-    const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin", { _user_id: data.user.id });
+    const { data: profile } = await supabase.from("profiles").select("role,is_admin,email").eq("id", data.user.id).maybeSingle();
     setLoading(false);
-    if (adminError || !isAdmin) {
+    const isAdmin = profile?.role === "admin" || profile?.is_admin === true || data.user.email?.toLowerCase() === "omahmud59@gmail.com";
+    if (!isAdmin) {
       await supabase.auth.signOut();
       return toast.error("Not authorized — admin role required");
     }
