@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Menu, X, AlertTriangle } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 import { Logo } from "@/components/brand/Logo";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ const baseLinks = [
   { to: "/scoring", label: "Scoring" },
 ] as const;
 const adminLink = { to: "/admin", label: "Admin" } as const;
+type NavLink = (typeof baseLinks)[number] | typeof adminLink;
 
 export function Navbar() {
   const { lang, toggle } = useLang();
@@ -40,7 +42,7 @@ export function Navbar() {
       if (!cancelled) setRole(profile?.role === "admin" ? "admin" : initialRole);
     };
 
-    const applySession = (session: any) => {
+    const applySession = (session: Session | null) => {
       const u = session?.user;
       if (!u) { setAuthed(null); setRole("user"); return; }
       setAuthed({ email: u.email ?? "", id: u.id });
@@ -65,14 +67,14 @@ export function Navbar() {
     await supabase.auth.signOut();
   };
 
-  const visibleLinks = baseLinks.filter((l: any) => !l.historyOnly || hasHistory || authed);
+  const visibleLinks = baseLinks.filter((l) => !l.historyOnly || hasHistory || authed) as NavLink[];
 
   return (
     <header className="sticky top-0 z-50 glass-strong border-b border-[color:var(--border)]">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="shrink-0"><Logo /></Link>
         <ul className="hidden lg:flex items-center gap-1">
-          {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l: any) => {
+          {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
             const danger = !!l.danger;
             return (
@@ -124,7 +126,7 @@ export function Navbar() {
       {open && (
         <div className="lg:hidden border-t border-[color:var(--border)] glass-strong">
           <ul className="px-4 py-3 space-y-1">
-            {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l: any) => (
+            {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
               <li key={l.to}>
                 <Link to={l.to} onClick={() => setOpen(false)}
                   className={`block px-3 py-2 rounded-md text-sm ${l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}>
