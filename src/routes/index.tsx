@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, Brain, ChartBar, Upload as UploadIcon, Languages, Newspaper, Search, Users, Shield, FileText, Bot, Network, Activity } from "lucide-react";
 import { GridBackground } from "@/components/brand/GridBackground";
+import { LiveStatsBar } from "@/components/brand/LiveStatsBar";
 import { Marquee } from "@/components/brand/Marquee";
 import { useLang, t } from "@/lib/i18n";
 import { trendingDeepfakes } from "@/lib/mockData";
