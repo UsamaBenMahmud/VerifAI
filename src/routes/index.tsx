@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, Brain, ChartBar, Upload as UploadIcon, Languages, Newspaper, Search, Users, Shield, FileText, Bot, Network, Activity } from "lucide-react";
+import { ArrowRight, Brain, Upload as UploadIcon, Languages, Newspaper, Search, Users, Shield, FileText, Bot, Activity } from "lucide-react";
 import { GridBackground } from "@/components/brand/GridBackground";
 import { LiveStatsBar } from "@/components/brand/LiveStatsBar";
 import { Marquee } from "@/components/brand/Marquee";
@@ -112,26 +112,49 @@ function Home() {
         ))}
       </section>
 
-      {/* HOW IT WORKS */}
+      {/* PROBLEM */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="text-center">
+          <span className="inline-block text-xs font-mono uppercase tracking-widest text-danger border border-danger/40 rounded px-3 py-1">The Problem</span>
+          <h2 className="mt-4 font-display text-3xl sm:text-4xl font-bold">Bangla deepfakes spread faster than fact-checkers can debunk them</h2>
+          <p className="mt-2 text-cyan/90 font-bangla text-lg">বাংলা ডিপফেক ছড়িয়ে পড়ে — সত্য যাচাই হওয়ার আগেই</p>
+        </div>
+        <div className="mt-8 grid md:grid-cols-3 gap-4">
+          {[
+            { stat: "30s", h: "to fabricate a face", p: "Open-source GAN tools now generate convincing synthetic faces in under a minute, on a laptop." },
+            { stat: "3 days", h: "average debunk time", p: "Newsroom fact-checks lag behind the viral curve — by the time the correction lands, the damage is done." },
+            { stat: "0 tools", h: "built for Bangla", p: "Every major deepfake detector ships English-only. Bangladeshi journalists and citizens have no native option." },
+          ].map((c) => (
+            <div key={c.h} className="glass rounded-xl p-6">
+              <div className="font-display text-4xl font-bold text-danger">{c.stat}</div>
+              <h3 className="mt-2 font-display font-semibold">{c.h}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{c.p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HOW IT WORKS — honest 3-step pipeline */}
       <section className="mx-auto max-w-7xl px-6 py-16">
         <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">How It Works</h2>
-        <p className="mt-2 text-center text-muted-foreground">Four agents. One trust score. Six seconds.</p>
+        <p className="mt-2 text-center text-muted-foreground">ML deepfake detector + LLM forensic explainer. Bilingual output. Under 6 seconds.</p>
         <div className="mt-10 grid md:grid-cols-4 gap-4 relative">
           {[
-            { icon: UploadIcon, title: "Upload", desc: "Video, image, or URL" },
-            { icon: Brain, title: "4 AI Agents", desc: "Parallel analysis" },
-            { icon: ChartBar, title: "Trust Score", desc: "0–100 with confidence" },
-            { icon: Languages, title: "Explain", desc: "Bangla + English" },
+            { icon: UploadIcon, title: "Input", desc: "Video upload, URL, or live camera capture" },
+            { icon: Brain, title: "EfficientNet-B2", desc: "Vision model trained on FaceForensics++ + Celeb-DF v2 returns fake/real probability" },
+            { icon: Bot, title: "Gemini Explainer", desc: "LLM converts the score into bilingual verdict + risk factors" },
+            { icon: Languages, title: "Verdict", desc: "Trust score 0–100, confidence interval, Bangla + English explanation" },
           ].map((step, i) => (
             <div key={step.title} className="glass rounded-xl p-6 relative">
               <div className="absolute -top-3 left-4 font-mono text-xs px-2 py-0.5 rounded bg-cyan text-[color:var(--bg-deep)] font-bold">0{i + 1}</div>
               <step.icon className="h-7 w-7 text-cyan mb-3" />
               <h3 className="font-display font-semibold">{step.title}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{step.desc}</p>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
             </div>
           ))}
         </div>
       </section>
+
 
       {/* WHO IT'S FOR */}
       <section className="mx-auto max-w-7xl px-6 py-16">
@@ -236,17 +259,40 @@ function Home() {
         </div>
       </section>
 
+      {/* IMPACT & KPIs */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="text-center">
+          <span className="inline-block text-xs font-mono uppercase tracking-widest text-cyan border border-cyan/40 rounded px-3 py-1">Impact & KPIs</span>
+          <h2 className="mt-4 font-display text-3xl sm:text-4xl font-bold">What success looks like</h2>
+          <p className="mt-2 text-muted-foreground">Measurable outcomes for Year 1 of deployment in Bangladesh.</p>
+        </div>
+        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { n: "≥85%", l: "Detection accuracy", sub: "On FaceForensics++ / Celeb-DF v2 holdout" },
+            { n: "<6s", l: "Time to verdict", sub: "From upload to bilingual explanation" },
+            { n: "1,000", l: "Journalists onboarded", sub: "Newsrooms + freelance fact-checkers" },
+            { n: "50,000", l: "Citizen scans / month", sub: "Free tier, Bangla-first interface" },
+          ].map((s) => (
+            <div key={s.l} className="glass rounded-xl p-6">
+              <div className="font-display text-4xl font-bold text-cyan text-glow-cyan">{s.n}</div>
+              <div className="mt-2 font-semibold text-sm">{s.l}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section className="mx-auto max-w-7xl px-6 py-16">
-        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Built to Forensic Standards</h2>
+        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Built for trust, not hype</h2>
         <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { icon: Brain, h: "Multi-Agent AI", p: "Vision + Metadata + Knowledge Graph + LLM Reasoning fire in parallel." },
-            { icon: Network, h: "Source Credibility Graph", p: "Neo4j-powered graph traces every claim back to its origin." },
-            { icon: Activity, h: "Confidence Intervals", p: "Never '100% fake.' Always shows ±uncertainty range." },
-            { icon: Shield, h: "Privacy-First", p: "Uploads auto-delete in 24 hours. No face database stored." },
-            { icon: FileText, h: "Legal PDF Reports", p: "One-click evidence chain export for law enforcement." },
-            { icon: Bot, h: "Telegram Bot", p: "Citizens report suspicious videos directly via Telegram." },
+            { icon: Brain, h: "ML + LLM pipeline", p: "EfficientNet-B2 vision detector feeds Gemini 2.5 Flash, which produces a calibrated bilingual verdict." },
+            { icon: Activity, h: "Confidence intervals", p: "Never '100% fake.' Every verdict ships with a confidence range so reviewers know when to look closer." },
+            { icon: Languages, h: "Bangla-first output", p: "Every explanation and risk factor is generated in Bangla and English by the LLM, not machine-translated." },
+            { icon: Shield, h: "Privacy by default", p: "Uploads are stored in signed-URL buckets with 24-hour expiry. No face database is built or retained." },
+            { icon: FileText, h: "Auditable scores", p: "Trust score, raw model probability, and sub-scores are all exposed in the result and saved to history." },
+            { icon: UploadIcon, h: "Three input modes", p: "Drag-and-drop upload, remote URL fetch, or live camera capture — all run the same pipeline." },
           ].map((f) => (
             <div key={f.h} className="glass rounded-xl p-5 hover:border-cyan/40 transition">
               <f.icon className="h-6 w-6 text-cyan mb-3" />
@@ -256,6 +302,7 @@ function Home() {
           ))}
         </div>
       </section>
+
     </>
   );
 }

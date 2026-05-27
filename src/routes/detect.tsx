@@ -445,10 +445,10 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
       {/* Sub-scores */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: "👁️", en: "Facial Artifact Score", bn: "মুখমণ্ডল বিশ্লেষণ", val: result.subScores.vision, color: "#FF3B5C", detailEn: "Lip-sync mismatch detected in 3 regions", detailBn: "৩টি অঞ্চলে ঠোঁট-সিঙ্ক অমিল" },
-          { icon: "📋", en: "Metadata Integrity", bn: "মেটাডেটা যাচাই", val: result.subScores.metadata, color: "#FF3B5C", detailEn: "No C2PA credentials. EXIF timestamp inconsistent.", detailBn: "C2PA নেই, EXIF টাইমস্ট্যাম্প অসঙ্গত।" },
-          { icon: "🕸️", en: "Known Deepfake Match", bn: "পরিচিত ডিপফেক মিল", val: result.subScores.knowledge, color: "#FFB830", detailEn: "7 similar cases found in knowledge graph", detailBn: "৭টি অনুরূপ কেস পাওয়া গেছে" },
-          { icon: "🎵", en: "Audio-Visual Sync", bn: "অডিও-ভিজ্যুয়াল সামঞ্জস্য", val: result.subScores.audio, color: "#FF3B5C", detailEn: "Voice-lip sync delta: 340ms (threshold: 80ms)", detailBn: "ভয়েস-ঠোঁট ব্যবধান: ৩৪০ms (সীমা: ৮০ms)" },
+          { icon: "👁️", en: "Facial Artifact Score", bn: "মুখমণ্ডল বিশ্লেষণ", val: result.subScores.vision, color: "#FF3B5C", detailEn: "Derived from EfficientNet-B2 fake/real probability.", detailBn: "EfficientNet-B2 মডেলের ফেক/রিয়েল সম্ভাবনা থেকে প্রাপ্ত।" },
+          { icon: "📋", en: "Metadata Integrity", bn: "মেটাডেটা যাচাই", val: result.subScores.metadata, color: "#FF3B5C", detailEn: "Heuristic baseline — EXIF/C2PA inspection not yet wired up.", detailBn: "হিউরিস্টিক বেসলাইন — EXIF/C2PA যাচাই এখনো যুক্ত নেই।" },
+          { icon: "🕸️", en: "Context Score", bn: "প্রসঙ্গ স্কোর", val: result.subScores.knowledge, color: "#FFB830", detailEn: "Placeholder for upcoming reverse-search + knowledge graph lookup.", detailBn: "রিভার্স-সার্চ ও নলেজ গ্রাফ যুক্ত হওয়ার জন্য প্লেসহোল্ডার।" },
+          { icon: "🎵", en: "Audio-Visual Sync", bn: "অডিও-ভিজ্যুয়াল সামঞ্জস্য", val: result.subScores.audio, color: "#FF3B5C", detailEn: "Not yet measured for video uploads.", detailBn: "ভিডিওর জন্য এখনো পরিমাপ করা হয়নি।" },
         ].map((c) => (
           <div key={c.en} className="glass rounded-xl p-4">
             <div className="flex items-center gap-2 text-sm font-semibold"><span className="text-lg">{c.icon}</span> {t(c.en, c.bn, lang)}</div>
