@@ -31,17 +31,30 @@ export function Navbar() {
 
   useEffect(() => {
     setHasHistory(getHistory().length > 0);
-    const refresh = async () => {
-      const { data } = await supabase.auth.getUser();
-      const u = data.user;
+    let cancelled = false;
+
+    const syncProfileRole = async (userId: string, fallbackRole: unknown) => {
+      const initialRole = fallbackRole === "admin" ? "admin" : "user";
+      setRole(initialRole);
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+      if (!cancelled) setRole(profile?.role === "admin" ? "admin" : initialRole);
+    };
+
+    const applySession = (session: any) => {
+      const u = session?.user;
       if (!u) { setAuthed(null); setRole("user"); return; }
       setAuthed({ email: u.email ?? "", id: u.id });
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", u.id).maybeSingle();
-      setRole(profile?.role === "admin" ? "admin" : "user");
+      const fallbackRole = u.user_metadata?.role;
+      window.setTimeout(() => { void syncProfileRole(u.id, fallbackRole); }, 0);
     };
-    refresh();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
-    return () => sub.subscription.unsubscribe();
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) applySession(data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
+    });
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, []);
 
   // Close mobile menu on route change
