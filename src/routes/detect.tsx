@@ -222,6 +222,7 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
 
   return (
     <div className="space-y-6">
+      <div ref={cardRef} className="space-y-6">
       {/* Header gauge */}
       <div className="glass rounded-2xl p-8 grid md:grid-cols-[260px_1fr] gap-8 items-center">
         <TrustGauge score={result.score} color={band.color} />
@@ -314,9 +315,12 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
         )}
       </div>
 
+      </div>
+
       {/* Actions */}
       <div className="glass rounded-2xl p-5 flex flex-wrap gap-3">
         <button onClick={() => toast.success("PDF report generated")} className="inline-flex items-center gap-2 rounded-md bg-cyan text-[color:var(--bg-deep)] px-4 py-2 text-sm font-semibold glow-cyan"><FileText className="h-4 w-4" /> {t("Download PDF Report", "PDF রিপোর্ট", lang)}</button>
+        <button onClick={shareAsImage} className="inline-flex items-center gap-2 rounded-md border border-cyan/40 px-4 py-2 text-sm hover:bg-cyan/10"><ImageIcon className="h-4 w-4" /> {t("Share as Image", "ছবি হিসেবে শেয়ার", lang)}</button>
         <button onClick={() => { navigator.clipboard?.writeText("https://verifai.app/a/VAI-2026-0847"); toast.success("Share link copied"); }} className="inline-flex items-center gap-2 rounded-md border border-cyan/40 px-4 py-2 text-sm hover:bg-cyan/10"><Share2 className="h-4 w-4" /> {t("Copy Link", "লিঙ্ক কপি", lang)}</button>
         <button onClick={() => toast.warning("Reported to BD Cyber Crime Unit")} className="inline-flex items-center gap-2 rounded-md border border-danger/50 text-danger px-4 py-2 text-sm hover:bg-danger/10"><Flag className="h-4 w-4" /> {t("Report", "রিপোর্ট", lang)}</button>
         <button onClick={() => toast("Embed snippet copied")} className="inline-flex items-center gap-2 rounded-md border border-cyan/40 px-4 py-2 text-sm hover:bg-cyan/10"><Code2 className="h-4 w-4" /> {t("Embed Badge", "ব্যাজ এম্বেড", lang)}</button>
