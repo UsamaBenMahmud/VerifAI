@@ -660,3 +660,46 @@ function DemoModal({ onClose, onRun }: { onClose: () => void; onRun: (k: "fake" 
     </div>
   );
 }
+
+function CompareResults({ a, b, onReset, lang }: { a: AnalysisResult; b: AnalysisResult; onReset: () => void; lang: any }) {
+  const delta = Math.abs(a.score - b.score);
+  const similar = delta <= 12;
+  const bandA = bandFor(a.score);
+  const bandB = bandFor(b.score);
+  return (
+    <div className="space-y-6">
+      <div className={`glass rounded-2xl p-5 border ${similar ? "border-warning/50" : "border-cyan/40"}`}>
+        <div className="flex items-center gap-3">
+          <Layers className={`h-6 w-6 ${similar ? "text-warning" : "text-cyan"}`} />
+          <div>
+            <div className="font-display text-lg font-bold">
+              {similar ? "High similarity — likely manipulated copy" : "Different sources / strong divergence"}
+            </div>
+            <div className="text-xs text-muted-foreground font-mono mt-1">
+              Score Δ = {delta} · Original {a.score}/100 · Suspected {b.score}/100
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        {[{ label: "Original", r: a, band: bandA }, { label: "Suspected", r: b, band: bandB }].map((s) => (
+          <div key={s.label} className="glass rounded-2xl p-6">
+            <div className="text-xs uppercase tracking-widest font-mono text-cyan mb-2">{s.label}</div>
+            <div className="font-display text-5xl font-bold" style={{ color: s.band.color }}>{s.r.score}<span className="text-base text-muted-foreground font-normal">/100</span></div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: s.band.color }}>{t(s.band.en, s.band.bn, lang)}</div>
+            <div className="mt-3 text-xs font-mono text-muted-foreground">Confidence {s.r.confidence.toFixed(1)}% ± {s.r.confidenceMargin.toFixed(1)}%</div>
+            <div className="mt-4 space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Vision</span><span className="font-mono">{s.r.subScores.vision}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Metadata</span><span className="font-mono">{s.r.subScores.metadata}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Knowledge</span><span className="font-mono">{s.r.subScores.knowledge}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Audio sync</span><span className="font-mono">{s.r.subScores.audio || "—"}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-center pt-2">
+        <button onClick={onReset} className="text-sm text-cyan hover:underline">← Analyze another</button>
+      </div>
+    </div>
+  );
+}
