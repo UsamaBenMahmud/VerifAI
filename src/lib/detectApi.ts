@@ -70,9 +70,11 @@ export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promis
   }
 
   const d = await res.json();
-  const score = Math.max(0, Math.min(100, Math.round(Number(d.trust_score ?? 50))));
-  const conf = Math.max(0, Math.min(100, Number(d.confidence ?? 90)));
-  const fakePct = Math.round(Number(d.fake_probability ?? 0) * 100);
+  const rawScore = Math.max(0, Math.min(100, Math.round(Number(d.trust_score ?? 50))));
+  const score = calibrateScore(rawScore, d.fake_probability);
+  const conf = Math.max(0, Math.min(100, Number(d.confidence ?? Math.min(score > 50 ? score : 100 - score, 95))));
+  const fakePct = Math.round(Number(d.fake_probability ?? (100 - score) / 100) * 100);
+  (d as any).__rawScore = rawScore;
   const subFromServer = d.sub_scores ?? {};
   const visionVal = Math.max(0, Math.min(100, Number(subFromServer.vision ?? (100 - fakePct))));
   const metadataVal = Math.max(0, Math.min(100, Number(subFromServer.metadata ?? 88)));
