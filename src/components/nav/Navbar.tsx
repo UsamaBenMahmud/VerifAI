@@ -37,16 +37,26 @@ export function Navbar() {
     const syncProfileRole = async (userId: string, fallbackRole: unknown) => {
       const initialRole = fallbackRole === "admin" ? "admin" : "user";
       setRole(initialRole);
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
       if (!cancelled) setRole(profile?.role === "admin" ? "admin" : initialRole);
     };
 
     const applySession = (session: Session | null) => {
       const u = session?.user;
-      if (!u) { setAuthed(null); setRole("user"); return; }
+      if (!u) {
+        setAuthed(null);
+        setRole("user");
+        return;
+      }
       setAuthed({ email: u.email ?? "", id: u.id });
       const fallbackRole = u.user_metadata?.role;
-      window.setTimeout(() => { void syncProfileRole(u.id, fallbackRole); }, 0);
+      window.setTimeout(() => {
+        void syncProfileRole(u.id, fallbackRole);
+      }, 0);
     };
 
     void supabase.auth.getSession().then(({ data }) => {
@@ -55,11 +65,16 @@ export function Navbar() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       applySession(session);
     });
-    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   // Close mobile menu on route change
-  useEffect(() => { setOpen(false); }, [path]);
+  useEffect(() => {
+    setOpen(false);
+  }, [path]);
 
   const onAdminExpire = async () => {
     sessionStorage.removeItem("adminSessionStart");
@@ -71,7 +86,9 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 glass-strong border-b border-[color:var(--border)]">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="shrink-0"><Logo /></Link>
+        <Link to="/" className="shrink-0">
+          <Logo />
+        </Link>
         <ul className="hidden lg:flex items-center gap-1">
           {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
@@ -83,11 +100,17 @@ export function Navbar() {
                   title={danger ? "Report suspicious content" : undefined}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 ${
                     danger
-                      ? (active ? "text-danger" : "text-danger/80 hover:text-danger")
-                      : (active ? "text-cyan text-glow-cyan" : "text-muted-foreground hover:text-foreground")
+                      ? active
+                        ? "text-danger"
+                        : "text-danger/80 hover:text-danger"
+                      : active
+                        ? "text-cyan text-glow-cyan"
+                        : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {danger && <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse-dot" />}
+                  {danger && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse-dot" />
+                  )}
                   {l.label}
                 </Link>
               </li>
@@ -95,22 +118,36 @@ export function Navbar() {
           })}
         </ul>
         <div className="flex items-center gap-2">
-          <button onClick={toggle}
+          <button
+            onClick={toggle}
             className="rounded-md border border-[color:var(--border)] px-2.5 py-1.5 text-xs font-mono hover:border-cyan transition"
-            title="Toggle language">
+            title="Toggle language"
+          >
             {lang === "bn" ? "🇧🇩 বাং" : "🇬🇧 EN"}
           </button>
 
           {authed ? (
             <>
               {role === "admin" && <AdminSessionTimer onExpire={onAdminExpire} />}
-              <UserMenu initial={(authed.email[0] || "U").toUpperCase()} email={authed.email} role={role} />
+              <UserMenu
+                initial={(authed.email[0] || "U").toUpperCase()}
+                email={authed.email}
+                role={role}
+              />
             </>
           ) : (
             <div className="hidden sm:flex items-center gap-2">
-              <Link to="/login" className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition">Login</Link>
-              <Link to="/login" search={{ mode: "user", intent: "signup" }}
-                className="rounded-md bg-cyan px-3 py-1.5 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan hover:glow-cyan-strong transition">
+              <Link
+                to="/login"
+                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition"
+              >
+                Login
+              </Link>
+              <Link
+                to="/login"
+                search={{ mode: "user", intent: "signup" }}
+                className="rounded-md bg-cyan px-3 py-1.5 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan hover:glow-cyan-strong transition"
+              >
                 Try Free →
               </Link>
             </div>
@@ -127,21 +164,52 @@ export function Navbar() {
           <ul className="px-4 py-3 space-y-1">
             {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
               <li key={l.to}>
-                <Link to={l.to} onClick={() => setOpen(false)}
-                  className={`block px-3 py-2 rounded-md text-sm ${"danger" in l && l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}>
-                  {"danger" in l && l.danger && <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />}{l.label}
+                <Link
+                  to={l.to}
+                  onClick={() => setOpen(false)}
+                  className={`block px-3 py-2 rounded-md text-sm ${"danger" in l && l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}
+                >
+                  {"danger" in l && l.danger && (
+                    <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
+                  )}
+                  {l.label}
                 </Link>
               </li>
             ))}
             {!authed ? (
               <>
-                <li><Link to="/login" onClick={() => setOpen(false)} className="block px-3 py-2 rounded-md text-muted-foreground text-sm">Login</Link></li>
-                <li><Link to="/login" search={{ mode: "user", intent: "signup" }} onClick={() => setOpen(false)} className="block px-3 py-2 rounded-md text-cyan text-sm font-semibold">Try Free →</Link></li>
+                <li>
+                  <Link
+                    to="/login"
+                    onClick={() => setOpen(false)}
+                    className="block px-3 py-2 rounded-md text-muted-foreground text-sm"
+                  >
+                    Login
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/login"
+                    search={{ mode: "user", intent: "signup" }}
+                    onClick={() => setOpen(false)}
+                    className="block px-3 py-2 rounded-md text-cyan text-sm font-semibold"
+                  >
+                    Try Free →
+                  </Link>
+                </li>
               </>
             ) : (
               <li>
-                <button onClick={async () => { sessionStorage.removeItem("adminSessionStart"); await supabase.auth.signOut(); setOpen(false); }}
-                  className="block w-full text-left px-3 py-2 rounded-md text-danger text-sm">Logout</button>
+                <button
+                  onClick={async () => {
+                    sessionStorage.removeItem("adminSessionStart");
+                    await supabase.auth.signOut();
+                    setOpen(false);
+                  }}
+                  className="block w-full text-left px-3 py-2 rounded-md text-danger text-sm"
+                >
+                  Logout
+                </button>
               </li>
             )}
           </ul>
