@@ -141,25 +141,26 @@ export type PresentationMeta = {
   uploadedAt: number;
   fileType: "pdf" | "pptx";
   size: number;
+  url: string; // public URL in the 'presentations' Storage bucket
 };
-const PRES_DATA = "verifai_presentation";
 const PRES_META = "verifai_presentation_meta";
 const PRES_SLIDES = "verifai_slide_count";
 
 export function getPresentation(): { data: string | null; meta: PresentationMeta | null; slides: number } {
   if (!hasWindow()) return { data: null, meta: null, slides: 8 };
-  const data = localStorage.getItem(PRES_DATA);
+  // Migrate away from the old base64 key that blew the localStorage quota.
+  try { localStorage.removeItem("verifai_presentation"); } catch {}
   const metaRaw = localStorage.getItem(PRES_META);
   const slidesRaw = localStorage.getItem(PRES_SLIDES);
+  const meta = metaRaw ? (JSON.parse(metaRaw) as PresentationMeta) : null;
   return {
-    data,
-    meta: metaRaw ? (JSON.parse(metaRaw) as PresentationMeta) : null,
+    data: meta?.url ?? null,
+    meta,
     slides: slidesRaw ? Math.max(1, Math.min(100, Number(slidesRaw))) : 8,
   };
 }
-export function setPresentation(dataBase64: string, meta: PresentationMeta) {
+export function setPresentationMeta(meta: PresentationMeta) {
   if (!hasWindow()) return;
-  localStorage.setItem(PRES_DATA, dataBase64);
   localStorage.setItem(PRES_META, JSON.stringify(meta));
 }
 export function setSlideCount(n: number) {
@@ -168,8 +169,8 @@ export function setSlideCount(n: number) {
 }
 export function clearPresentation() {
   if (!hasWindow()) return;
-  localStorage.removeItem(PRES_DATA);
   localStorage.removeItem(PRES_META);
+  try { localStorage.removeItem("verifai_presentation"); } catch {}
 }
 
 /* ---------- Live stats (landing hero) ---------- */

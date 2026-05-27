@@ -676,13 +676,20 @@ function PresentationTab() {
     if (ext !== "pdf" && ext !== "pptx") return toast.error("Only .pptx or .pdf");
     setBusy(true);
     try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const path = `deck-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("presentations").upload(path, f, {
+        contentType: f.type || (ext === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        upsert: true,
+      });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from("presentations").getPublicUrl(path);
       const mod = await import("@/lib/localStore");
-      const b64 = await mod.fileToBase64(f);
       const newMeta: import("@/lib/localStore").PresentationMeta = {
-        filename: f.name, uploadedAt: Date.now(), fileType: ext as "pdf" | "pptx", size: f.size,
+        filename: f.name, uploadedAt: Date.now(), fileType: ext as "pdf" | "pptx", size: f.size, url: pub.publicUrl,
       };
-      mod.setPresentation(b64, newMeta);
-      setData(b64); setMeta(newMeta);
+      mod.setPresentationMeta(newMeta);
+      setData(pub.publicUrl); setMeta(newMeta);
       toast.success(`✅ Presentation uploaded — ${slideCount} slides ready`);
     } catch (e: any) {
       toast.error(e?.message || "Upload failed");
