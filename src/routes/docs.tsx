@@ -88,35 +88,43 @@ function Presentation() {
     a.href = data; a.download = meta.filename; a.click();
   };
 
-  const scrollToViewer = (n: number) => {
-    setActive(n);
-    document.getElementById("deck-viewer")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const gradients = [
     "from-cyan/20 to-violet/20", "from-violet/20 to-danger/20", "from-cyan/20 to-safe/20",
     "from-warning/20 to-danger/20", "from-safe/20 to-cyan/20", "from-violet/20 to-cyan/20",
   ];
+
+  const isPdf = meta?.fileType === "pdf";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <H2>Slide Deck</H2>
         {data && meta && (
-          <button onClick={download} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">⬇️ Download Original</button>
+          <div className="flex gap-2 flex-wrap">
+            <a href={data} target="_blank" rel="noreferrer" className="rounded-md border border-cyan/40 text-cyan px-4 py-2 text-sm font-semibold hover:bg-cyan/10">Open in new tab</a>
+            <button onClick={download} className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">⬇️ Download {meta.fileType.toUpperCase()}</button>
+          </div>
         )}
       </div>
 
       <div id="deck-viewer" className="glass rounded-2xl p-4 mb-6">
         {data && meta ? (
-          meta.fileType === "pdf" ? (
+          isPdf ? (
             <iframe src={`${data}#page=${active}`} title={meta.filename} className="w-full h-[70vh] rounded-lg bg-black" />
           ) : (
             <div className="aspect-video rounded-lg bg-gradient-to-br from-cyan/10 to-violet/10 border border-cyan/20 flex flex-col items-center justify-center text-center p-6">
               <FileText className="h-12 w-12 text-cyan mb-3" />
-              <div className="font-display text-lg">📊 Presentation uploaded</div>
-              <p className="text-sm text-muted-foreground mt-1">For best display, also export as PDF.</p>
-              <div className="mt-3 text-xs text-muted-foreground">{meta.filename} · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}</div>
+              <div className="font-display text-xl">{meta.filename}</div>
+              <p className="text-sm text-muted-foreground mt-2 max-w-md">
+                PowerPoint files can't be previewed in the browser. Open or download the deck to view it.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <a href={data} target="_blank" rel="noreferrer" className="rounded-md bg-cyan px-4 py-2 text-sm font-semibold text-[color:var(--bg-deep)] glow-cyan">Open Deck</a>
+                <a href={data} download={meta.filename} className="rounded-md border border-cyan/40 text-cyan px-4 py-2 text-sm font-semibold hover:bg-cyan/10">Download</a>
+              </div>
+              <div className="mt-3 text-[11px] text-muted-foreground">
+                {(meta.size / 1024 / 1024).toFixed(2)} MB · uploaded {new Date(meta.uploadedAt).toLocaleDateString()}
+              </div>
             </div>
           )
         ) : (
@@ -130,22 +138,23 @@ function Presentation() {
         )}
       </div>
 
-      <h3 className="font-display text-lg font-semibold mb-3">Slides</h3>
-      <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.from({ length: slides }).map((_, i) => {
-          const n = i + 1;
-          return (
-            <button key={n} onClick={() => scrollToViewer(n)}
-              className={`glass rounded-xl aspect-video p-5 flex flex-col justify-between hover:border-cyan/60 transition text-left bg-gradient-to-br ${gradients[i % gradients.length]} ${active === n ? "ring-2 ring-cyan glow-cyan" : ""}`}>
-              <div>
-                <div className="font-mono text-xs text-cyan">SLIDE {String(n).padStart(2, "0")}</div>
-                <div className="mt-3 font-display text-3xl font-bold">{n}</div>
-              </div>
-              <span className="self-end text-xs text-muted-foreground">Click to view</span>
-            </button>
-          );
-        })}
-      </div>
+      {isPdf && (
+        <>
+          <h3 className="font-display text-lg font-semibold mb-3">Jump to slide</h3>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-3">
+            {Array.from({ length: slides }).map((_, i) => {
+              const n = i + 1;
+              return (
+                <button key={n} onClick={() => { setActive(n); document.getElementById("deck-viewer")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                  className={`glass rounded-lg aspect-video p-3 flex flex-col justify-between hover:border-cyan/60 transition text-left bg-gradient-to-br ${gradients[i % gradients.length]} ${active === n ? "ring-2 ring-cyan glow-cyan" : ""}`}>
+                  <div className="font-mono text-[10px] text-cyan">SLIDE {String(n).padStart(2, "0")}</div>
+                  <div className="self-end font-display text-2xl font-bold">{n}</div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
