@@ -21,7 +21,6 @@ const baseLinks = [
   { to: "/scoring", label: "Scoring" },
 ] as const;
 const adminLink = { to: "/admin", label: "Admin" } as const;
-type NavLink = (typeof baseLinks)[number] | typeof adminLink;
 
 export function Navbar() {
   const { lang, toggle } = useLang();
@@ -67,7 +66,7 @@ export function Navbar() {
     await supabase.auth.signOut();
   };
 
-  const visibleLinks = baseLinks.filter((l) => !l.historyOnly || hasHistory || authed) as NavLink[];
+  const visibleLinks = baseLinks.filter((l) => !("historyOnly" in l) || hasHistory || authed);
 
   return (
     <header className="sticky top-0 z-50 glass-strong border-b border-[color:var(--border)]">
@@ -76,7 +75,7 @@ export function Navbar() {
         <ul className="hidden lg:flex items-center gap-1">
           {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
-            const danger = !!l.danger;
+            const danger = "danger" in l && l.danger;
             return (
               <li key={l.to}>
                 <Link
@@ -129,8 +128,8 @@ export function Navbar() {
             {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
               <li key={l.to}>
                 <Link to={l.to} onClick={() => setOpen(false)}
-                  className={`block px-3 py-2 rounded-md text-sm ${l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}>
-                  {l.danger && <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />}{l.label}
+                  className={`block px-3 py-2 rounded-md text-sm ${"danger" in l && l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}>
+                  {"danger" in l && l.danger && <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />}{l.label}
                 </Link>
               </li>
             ))}
