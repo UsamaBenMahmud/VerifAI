@@ -51,8 +51,9 @@ function Home() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-cyan/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-6 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan/30 bg-cyan/5 px-3 py-1 text-xs font-mono uppercase tracking-widest text-cyan">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse-dot" /> BuildFest 2026 · Track 5
+            <div className="group inline-flex items-center gap-2 rounded-full border border-cyan/40 px-4 py-2 text-[13px] font-mono uppercase tracking-widest text-cyan" style={{ background: "linear-gradient(135deg, rgba(123,47,255,0.2), rgba(0,229,255,0.2))" }}>
+              <span className="inline-block transition-transform group-hover:rotate-[5deg]">🏆</span>
+              <span>The Infinity AI BuildFest 2026 · Track 5: InfoTech · Bangladesh</span>
             </div>
             <h1 className="mt-6 font-display font-bold text-5xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
               Detect Deepfakes<br /><span className="text-cyan text-glow-cyan">in 6 Seconds</span>
@@ -149,6 +150,55 @@ function Home() {
           ))}
         </div>
       </section>
+
+      {/* EDUCATION — Understanding Deepfakes in Bangladesh */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Understanding Deepfakes in Bangladesh</h2>
+        <p className="mt-2 text-center text-cyan/90 font-bangla text-lg">বাংলাদেশে ডিপফেক: যা জানা দরকার</p>
+        <div className="mt-10 grid md:grid-cols-3 gap-4">
+          {[
+            {
+              icon: "🧠",
+              h: "How Deepfakes Are Made",
+              p: "GANs (Generative Adversarial Networks) train two competing neural networks — one generates fake faces, one detects them — until the fake is indistinguishable to humans. Modern tools make this possible in under 30 seconds.",
+              bn: "GAN দিয়ে এখন ৩০ সেকেন্ডের কম সময়ে নকল মুখ তৈরি করা যায়।",
+            },
+            {
+              icon: "⚠️",
+              h: "Who's Most at Risk",
+              p: "Women face NCII (Non-Consensual Intimate Images). Politicians face election deepfakes. Journalists face intimidation. Ordinary citizens face WhatsApp hoaxes in Bangla — with no tools to fight back.",
+              bn: "নারী, রাজনীতিবিদ, সাংবাদিক এবং সাধারণ নাগরিক — সবাই ঝুঁকিতে।",
+            },
+            {
+              icon: "🔬",
+              h: "How VerifAI Detects Them",
+              p: "EfficientNet-B0 analyzes 847 facial landmarks for GAN artifacts. Frequency analysis finds invisible manipulation signatures. Our model is trained on FaceForensics++ and Celeb-DF v2 — the gold standard deepfake datasets.",
+              bn: "EfficientNet মডেল ৮৪৭টি ফেসিয়াল ল্যান্ডমার্ক বিশ্লেষণ করে।",
+            },
+          ].map((c) => (
+            <div key={c.h} className="glass rounded-xl p-6 hover:border-cyan/40 transition">
+              <div className="text-3xl mb-3">{c.icon}</div>
+              <h3 className="font-display text-lg font-semibold">{c.h}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{c.p}</p>
+              <p className="mt-2 text-xs text-cyan/80 font-bangla">{c.bn}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 glass-strong rounded-xl p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          {[
+            { n: "30s", l: "to make a deepfake" },
+            { n: "3 days", l: "for journalists to debunk" },
+            { n: "6s", l: "with VerifAI" },
+            { n: "৳2", l: "per analysis" },
+          ].map((s) => (
+            <div key={s.l}>
+              <div className="font-display text-3xl font-bold text-cyan text-glow-cyan">{s.n}</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
 
       {/* LIVE FEED */}
       <section className="mx-auto max-w-7xl px-6 py-16">

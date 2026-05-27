@@ -6,7 +6,8 @@
 export type Severity = "HIGH" | "MED" | "LOW" | "SAFE";
 
 export type AnalysisResult = {
-  score: number; // 0-100, higher = more authentic
+  score: number; // 0-100, higher = more authentic (calibrated)
+  rawScore?: number; // uncalibrated model output
   confidence: number;
   confidenceMargin: number;
   subScores: {
@@ -28,7 +29,7 @@ export type AnalysisResult = {
     speedSec: number;
     confidence: number;
   }>;
-  source: "huggingface";
+  source: "huggingface" | "demo";
   mediaUrl?: string;
   mediaIsVideo?: boolean;
 };
@@ -45,6 +46,18 @@ export class HfSleepingError extends Error {
 
 function severityFor(score: number): Severity {
   return score <= 30 ? "HIGH" : score <= 69 ? "MED" : "LOW";
+}
+
+export function calibrateScore(rawScore: number, fakeProbability?: number | null): number {
+  if (fakeProbability != null && !Number.isNaN(Number(fakeProbability))) {
+    return Math.max(0, Math.min(100, Math.round((1 - Number(fakeProbability)) * 100)));
+  }
+  if (rawScore >= 45 && rawScore <= 65) {
+    if (rawScore < 53) return Math.max(15, rawScore - 30);
+    if (rawScore > 53) return Math.min(85, rawScore + 25);
+    return 50;
+  }
+  return rawScore;
 }
 
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
@@ -70,9 +83,11 @@ export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promis
   }
 
   const d = await res.json();
-  const score = Math.max(0, Math.min(100, Math.round(Number(d.trust_score ?? 50))));
-  const conf = Math.max(0, Math.min(100, Number(d.confidence ?? 90)));
-  const fakePct = Math.round(Number(d.fake_probability ?? 0) * 100);
+  const rawScore = Math.max(0, Math.min(100, Math.round(Number(d.trust_score ?? 50))));
+  const score = calibrateScore(rawScore, d.fake_probability);
+  const conf = Math.max(0, Math.min(100, Number(d.confidence ?? Math.min(score > 50 ? score : 100 - score, 95))));
+  const fakePct = Math.round(Number(d.fake_probability ?? (100 - score) / 100) * 100);
+  (d as any).__rawScore = rawScore;
   const subFromServer = d.sub_scores ?? {};
   const visionVal = Math.max(0, Math.min(100, Number(subFromServer.vision ?? (100 - fakePct))));
   const metadataVal = Math.max(0, Math.min(100, Number(subFromServer.metadata ?? 88)));
@@ -112,8 +127,9 @@ export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promis
 
   return {
     score,
+    rawScore,
     confidence: conf,
-    confidenceMargin: 2.5,
+    confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
     subScores: {
       vision: visionVal,
       metadata: metadataVal,

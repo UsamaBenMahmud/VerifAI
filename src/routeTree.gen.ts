@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as SubmitRumorRouteImport } from './routes/submit-rumor'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ScoringRouteImport } from './routes/scoring'
@@ -25,6 +26,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAnalyzeImageRouteImport } from './routes/api/analyze-image'
 
+const WatchlistRoute = WatchlistRouteImport.update({
+  id: '/watchlist',
+  path: '/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubmitRumorRoute = SubmitRumorRouteImport.update({
   id: '/submit-rumor',
   path: '/submit-rumor',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
   '/submit-rumor': typeof SubmitRumorRoute
+  '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
   '/submit-rumor': typeof SubmitRumorRoute
+  '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRoutesById {
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/scoring': typeof ScoringRoute
   '/signup': typeof SignupRoute
   '/submit-rumor': typeof SubmitRumorRoute
+  '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/scoring'
     | '/signup'
     | '/submit-rumor'
+    | '/watchlist'
     | '/api/analyze-image'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/scoring'
     | '/signup'
     | '/submit-rumor'
+    | '/watchlist'
     | '/api/analyze-image'
   id:
     | '__root__'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/scoring'
     | '/signup'
     | '/submit-rumor'
+    | '/watchlist'
     | '/api/analyze-image'
   fileRoutesById: FileRoutesById
 }
@@ -222,11 +234,19 @@ export interface RootRouteChildren {
   ScoringRoute: typeof ScoringRoute
   SignupRoute: typeof SignupRoute
   SubmitRumorRoute: typeof SubmitRumorRoute
+  WatchlistRoute: typeof WatchlistRoute
   ApiAnalyzeImageRoute: typeof ApiAnalyzeImageRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/watchlist': {
+      id: '/watchlist'
+      path: '/watchlist'
+      fullPath: '/watchlist'
+      preLoaderRoute: typeof WatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/submit-rumor': {
       id: '/submit-rumor'
       path: '/submit-rumor'
@@ -350,6 +370,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScoringRoute: ScoringRoute,
   SignupRoute: SignupRoute,
   SubmitRumorRoute: SubmitRumorRoute,
+  WatchlistRoute: WatchlistRoute,
   ApiAnalyzeImageRoute: ApiAnalyzeImageRoute,
 }
 export const routeTree = rootRouteImport

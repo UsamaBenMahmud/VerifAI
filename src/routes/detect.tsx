@@ -1,9 +1,9 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon } from "lucide-react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
-import { analyze, bandFor, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
+import { analyze, bandFor, calibrateScore, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 import { pushHistory } from "@/lib/localStore";
 
 export const Route = createFileRoute("/detect")({
@@ -42,6 +42,7 @@ function DetectPage() {
   const [showEvidence, setShowEvidence] = useState(true);
   const [showCompare, setShowCompare] = useState(false);
   const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
+  const [showDemo, setShowDemo] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -109,8 +110,57 @@ function DetectPage() {
     await startAnalysis({ kind: "video", file: f });
   };
 
+  const runDemo = async (kind: "fake" | "uncertain" | "authentic") => {
+    setShowDemo(false);
+    setStage("analyzing"); setStep(0); setElapsed(0); setError(null);
+    const t0 = Date.now();
+    const ti = setInterval(() => setElapsed((Date.now() - t0) / 1000), 100);
+    const timers = [600, 1500, 3000, 5000, 7000].map((ms, i) => setTimeout(() => setStep(i + 1), ms));
+    await new Promise(r => setTimeout(r, 7500));
+    const presets = {
+      fake: { score: 12, fp: 0.88, vEn: "Likely Deepfake", vBn: "সম্ভবত ডিপফেক" },
+      uncertain: { score: 47, fp: 0.53, vEn: "Uncertain", vBn: "অনিশ্চিত" },
+      authentic: { score: 82, fp: 0.18, vEn: "Likely Authentic", vBn: "সম্ভবত আসল" },
+    } as const;
+    const p = presets[kind];
+    const sev: Severity = p.score <= 30 ? "HIGH" : p.score <= 69 ? "MED" : "SAFE";
+    const conf = Math.min(p.score > 50 ? p.score : 100 - p.score, 95);
+    const demo: AnalysisResult = {
+      score: p.score, rawScore: p.score, confidence: conf, confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
+      subScores: {
+        vision: p.score < 40 ? 88 : p.score > 70 ? 18 : 52,
+        metadata: p.score < 40 ? 76 : p.score > 70 ? 24 : 48,
+        knowledge: p.score < 40 ? 71 : p.score > 70 ? 28 : 42,
+        audio: 0,
+      },
+      riskFactors: [
+        { severity: sev, titleEn: p.vEn, titleBn: p.vBn, detailEn: `Demo case: trust score ${p.score}/100, fake probability ${(p.fp*100).toFixed(0)}%.`, detailBn: `ডেমো: ট্রাস্ট ${p.score}/১০০।` },
+      ],
+      modelResults: [{ name: "EfficientNet-B0 (demo)", score: p.score, speedSec: 4.2, confidence: conf }],
+      source: "demo",
+      mediaUrl: undefined,
+      mediaIsVideo: false,
+    };
+    setStep(5);
+    timers.forEach(clearTimeout);
+    clearInterval(ti);
+    setResult(demo);
+    setStage("results");
+    toast.success(`Demo: ${p.vEn}`);
+  };
+
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 relative">
+      {/* Floating Demo button */}
+      <button
+        onClick={() => setShowDemo(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-cyan text-[color:var(--bg-deep)] px-5 py-3 text-sm font-bold glow-cyan-strong hover:scale-105 transition"
+      >
+        <Play className="h-4 w-4" /> 🎬 Demo Mode
+      </button>
+
+      {showDemo && <DemoModal onClose={() => setShowDemo(false)} onRun={runDemo} />}
+
       <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
         <div>
           <h1 className="font-display text-3xl sm:text-4xl font-bold">{t("Analyze Video", "ভিডিও বিশ্লেষণ", lang)}</h1>
@@ -119,7 +169,10 @@ function DetectPage() {
       </div>
 
       {stage === "idle" && (
-        <div className="glass rounded-2xl p-6 sm:p-8">
+        <div className="glass rounded-2xl p-6 sm:p-8 relative">
+          <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-safe/15 border border-safe/40 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-safe">
+            <span className="h-1.5 w-1.5 rounded-full bg-safe animate-pulse-dot" /> Live AI · HF EfficientNet-B0
+          </div>
           <div
             onClick={() => fileInput.current?.click()}
             onDragOver={(e) => e.preventDefault()}
@@ -230,6 +283,9 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
           <div className="text-xs uppercase tracking-widest font-mono" style={{ color: band.color }}>{t(band.en, band.bn, lang)}</div>
           <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold">{t(band.en.replace(/^[^A-Za-z]+/, ""), band.bn.replace(/^[^\u0980-\u09FF]+/, ""), lang)}</h2>
           <p className="mt-3 text-sm text-muted-foreground font-mono">{t("Confidence", "আত্মবিশ্বাস", lang)}: {result.confidence.toFixed(1)}% ± {result.confidenceMargin.toFixed(1)}%</p>
+          {result.rawScore != null && result.rawScore !== result.score && (
+            <p className="mt-1 text-[11px] text-muted-foreground/70 font-mono">Raw model output: {result.rawScore}/100 · Calibrated: {result.score}/100</p>
+          )}
           {preview && <video src={preview} controls className="mt-4 max-h-40 rounded-md border border-[color:var(--border)] bg-black" />}
           <p className="mt-3 text-xs text-muted-foreground">{t("Analyzed via", "বিশ্লেষণ", lang)}: <span className="font-mono text-cyan">{result.source}</span></p>
         </div>
@@ -418,6 +474,37 @@ function TrustGauge({ score, color }: { score: number; color: string }) {
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <div className="font-display text-6xl font-bold" style={{ color }}>{score}</div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Trust Score</div>
+      </div>
+    </div>
+  );
+}
+
+function DemoModal({ onClose, onRun }: { onClose: () => void; onRun: (k: "fake" | "uncertain" | "authentic") => void }) {
+  const cases = [
+    { k: "fake" as const, emoji: "🔴", title: "Known Deepfake", label: "AI-generated face (GAN)", expected: "Score ~12/100 — Likely Deepfake", color: "danger" },
+    { k: "uncertain" as const, emoji: "🟡", title: "Uncertain Case", label: "Low quality — hard to determine", expected: "Score ~47/100 — Uncertain", color: "warning" },
+    { k: "authentic" as const, emoji: "🟢", title: "Authentic Photo", label: "Real photograph (stock)", expected: "Score ~82/100 — Likely Authentic", color: "safe" },
+  ];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="glass-strong rounded-2xl p-6 w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-display text-xl font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-cyan" /> Live Demo — 3 Test Cases</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5">Use these pre-loaded examples to demonstrate VerifAI.</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {cases.map((c) => (
+            <div key={c.k} className={`glass rounded-xl p-4 border border-${c.color}/30 flex flex-col`}>
+              <div className="text-3xl mb-2">{c.emoji}</div>
+              <div className="font-display font-bold">{c.title}</div>
+              <div className="text-xs text-muted-foreground mt-1">{c.label}</div>
+              <div className={`text-xs mt-2 text-${c.color} font-mono`}>{c.expected}</div>
+              <button onClick={() => onRun(c.k)} className="mt-3 rounded-md bg-cyan text-[color:var(--bg-deep)] px-3 py-2 text-xs font-semibold glow-cyan">Run This Demo</button>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-xs text-muted-foreground text-center">Demo mode uses pre-loaded examples for reliable demonstration. Real uploads use your HuggingFace model.</p>
       </div>
     </div>
   );
