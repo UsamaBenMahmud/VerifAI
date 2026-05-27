@@ -6,7 +6,8 @@
 export type Severity = "HIGH" | "MED" | "LOW" | "SAFE";
 
 export type AnalysisResult = {
-  score: number; // 0-100, higher = more authentic
+  score: number; // 0-100, higher = more authentic (calibrated)
+  rawScore?: number; // uncalibrated model output
   confidence: number;
   confidenceMargin: number;
   subScores: {
@@ -28,7 +29,7 @@ export type AnalysisResult = {
     speedSec: number;
     confidence: number;
   }>;
-  source: "huggingface";
+  source: "huggingface" | "demo";
   mediaUrl?: string;
   mediaIsVideo?: boolean;
 };
