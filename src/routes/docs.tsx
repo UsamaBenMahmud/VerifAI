@@ -313,6 +313,31 @@ function DataFlow() {
           </div>
         ))}
       </div>
+
+      <H2>n8n Automation Workflow</H2>
+      <div className="glass rounded-xl p-5 overflow-x-auto">
+        <div className="min-w-[720px] grid grid-cols-5 gap-3 items-stretch">
+          {[
+            { l: "🔔 Webhook Trigger", sub: "POST /verifai/scan", c: "cyan" },
+            { l: "🔥 Firecrawl", sub: "Scrape source URL", c: "violet" },
+            { l: "🧠 VerifAI Detect", sub: "Multi-agent analysis", c: "violet" },
+            { l: "📊 Score Router", sub: "if score < 40", c: "warning" },
+            { l: "📨 Telegram Bot", sub: "Alert journalists", c: "safe" },
+          ].map((n, i) => (
+            <div key={i} className="relative">
+              <div className={`glass rounded-lg p-3 border-l-2 ${n.c === "cyan" ? "border-cyan" : n.c === "violet" ? "border-violet" : n.c === "warning" ? "border-warning" : "border-safe"}`}>
+                <div className={`text-xs font-semibold ${n.c === "cyan" ? "text-cyan" : n.c === "violet" ? "text-violet" : n.c === "warning" ? "text-warning" : "text-safe"}`}>{n.l}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground font-mono">{n.sub}</div>
+              </div>
+              {i < 4 && <div className="hidden md:block absolute top-1/2 -right-2 text-cyan/60">→</div>}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 text-xs text-muted-foreground font-mono">
+          Triggers: <span className="text-cyan">Cron (5min)</span> · <span className="text-cyan">Webhook</span> · <span className="text-cyan">Telegram</span>
+          {" · "}Nodes: <span className="text-violet">5</span> · Avg runtime: <span className="text-violet">~7s</span>
+        </div>
+      </div>
     </div>
   );
 }
