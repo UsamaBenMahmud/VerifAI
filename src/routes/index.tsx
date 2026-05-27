@@ -151,6 +151,55 @@ function Home() {
         </div>
       </section>
 
+      {/* EDUCATION — Understanding Deepfakes in Bangladesh */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Understanding Deepfakes in Bangladesh</h2>
+        <p className="mt-2 text-center text-cyan/90 font-bangla text-lg">বাংলাদেশে ডিপফেক: যা জানা দরকার</p>
+        <div className="mt-10 grid md:grid-cols-3 gap-4">
+          {[
+            {
+              icon: "🧠",
+              h: "How Deepfakes Are Made",
+              p: "GANs (Generative Adversarial Networks) train two competing neural networks — one generates fake faces, one detects them — until the fake is indistinguishable to humans. Modern tools make this possible in under 30 seconds.",
+              bn: "GAN দিয়ে এখন ৩০ সেকেন্ডের কম সময়ে নকল মুখ তৈরি করা যায়।",
+            },
+            {
+              icon: "⚠️",
+              h: "Who's Most at Risk",
+              p: "Women face NCII (Non-Consensual Intimate Images). Politicians face election deepfakes. Journalists face intimidation. Ordinary citizens face WhatsApp hoaxes in Bangla — with no tools to fight back.",
+              bn: "নারী, রাজনীতিবিদ, সাংবাদিক এবং সাধারণ নাগরিক — সবাই ঝুঁকিতে।",
+            },
+            {
+              icon: "🔬",
+              h: "How VerifAI Detects Them",
+              p: "EfficientNet-B0 analyzes 847 facial landmarks for GAN artifacts. Frequency analysis finds invisible manipulation signatures. Our model is trained on FaceForensics++ and Celeb-DF v2 — the gold standard deepfake datasets.",
+              bn: "EfficientNet মডেল ৮৪৭টি ফেসিয়াল ল্যান্ডমার্ক বিশ্লেষণ করে।",
+            },
+          ].map((c) => (
+            <div key={c.h} className="glass rounded-xl p-6 hover:border-cyan/40 transition">
+              <div className="text-3xl mb-3">{c.icon}</div>
+              <h3 className="font-display text-lg font-semibold">{c.h}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{c.p}</p>
+              <p className="mt-2 text-xs text-cyan/80 font-bangla">{c.bn}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 glass-strong rounded-xl p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          {[
+            { n: "30s", l: "to make a deepfake" },
+            { n: "3 days", l: "for journalists to debunk" },
+            { n: "6s", l: "with VerifAI" },
+            { n: "৳2", l: "per analysis" },
+          ].map((s) => (
+            <div key={s.l}>
+              <div className="font-display text-3xl font-bold text-cyan text-glow-cyan">{s.n}</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+
       {/* LIVE FEED */}
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="flex items-end justify-between mb-6 flex-wrap gap-2">
