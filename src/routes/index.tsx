@@ -259,17 +259,40 @@ function Home() {
         </div>
       </section>
 
+      {/* IMPACT & KPIs */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="text-center">
+          <span className="inline-block text-xs font-mono uppercase tracking-widest text-cyan border border-cyan/40 rounded px-3 py-1">Impact & KPIs</span>
+          <h2 className="mt-4 font-display text-3xl sm:text-4xl font-bold">What success looks like</h2>
+          <p className="mt-2 text-muted-foreground">Measurable outcomes for Year 1 of deployment in Bangladesh.</p>
+        </div>
+        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { n: "≥85%", l: "Detection accuracy", sub: "On FaceForensics++ / Celeb-DF v2 holdout" },
+            { n: "<6s", l: "Time to verdict", sub: "From upload to bilingual explanation" },
+            { n: "1,000", l: "Journalists onboarded", sub: "Newsrooms + freelance fact-checkers" },
+            { n: "50,000", l: "Citizen scans / month", sub: "Free tier, Bangla-first interface" },
+          ].map((s) => (
+            <div key={s.l} className="glass rounded-xl p-6">
+              <div className="font-display text-4xl font-bold text-cyan text-glow-cyan">{s.n}</div>
+              <div className="mt-2 font-semibold text-sm">{s.l}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section className="mx-auto max-w-7xl px-6 py-16">
-        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Built to Forensic Standards</h2>
+        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center">Built for trust, not hype</h2>
         <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { icon: Brain, h: "Multi-Agent AI", p: "Vision + Metadata + Knowledge Graph + LLM Reasoning fire in parallel." },
-            { icon: Network, h: "Source Credibility Graph", p: "Neo4j-powered graph traces every claim back to its origin." },
-            { icon: Activity, h: "Confidence Intervals", p: "Never '100% fake.' Always shows ±uncertainty range." },
-            { icon: Shield, h: "Privacy-First", p: "Uploads auto-delete in 24 hours. No face database stored." },
-            { icon: FileText, h: "Legal PDF Reports", p: "One-click evidence chain export for law enforcement." },
-            { icon: Bot, h: "Telegram Bot", p: "Citizens report suspicious videos directly via Telegram." },
+            { icon: Brain, h: "ML + LLM pipeline", p: "EfficientNet-B2 vision detector feeds Gemini 2.5 Flash, which produces a calibrated bilingual verdict." },
+            { icon: Activity, h: "Confidence intervals", p: "Never '100% fake.' Every verdict ships with a confidence range so reviewers know when to look closer." },
+            { icon: Languages, h: "Bangla-first output", p: "Every explanation and risk factor is generated in Bangla and English by the LLM, not machine-translated." },
+            { icon: Shield, h: "Privacy by default", p: "Uploads are stored in signed-URL buckets with 24-hour expiry. No face database is built or retained." },
+            { icon: FileText, h: "Auditable scores", p: "Trust score, raw model probability, and sub-scores are all exposed in the result and saved to history." },
+            { icon: UploadIcon, h: "Three input modes", p: "Drag-and-drop upload, remote URL fetch, or live camera capture — all run the same pipeline." },
           ].map((f) => (
             <div key={f.h} className="glass rounded-xl p-5 hover:border-cyan/40 transition">
               <f.icon className="h-6 w-6 text-cyan mb-3" />
@@ -279,6 +302,7 @@ function Home() {
           ))}
         </div>
       </section>
+
     </>
   );
 }
