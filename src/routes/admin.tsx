@@ -662,21 +662,30 @@ function PresentationTab() {
   const [meta, setMeta] = useState<import("@/lib/localStore").PresentationMeta | null>(null);
   const [slideCount, setSlideCountLocal] = useState(8);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     import("@/lib/localStore").then((m) => {
       const p = m.getPresentation();
       setData(p.data); setMeta(p.meta); setSlideCountLocal(p.slides);
     });
+    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const onUpload = async (f: File) => {
-    if (f.size > 100 * 1024 * 1024) return toast.error("File too large (max 100MB)");
+    setLastError(null);
+    if (f.size > 100 * 1024 * 1024) { setLastError("File too large (max 100MB)"); return toast.error("File too large (max 100MB)"); }
     const ext = f.name.split(".").pop()?.toLowerCase();
-    if (ext !== "pdf" && ext !== "pptx") return toast.error("Only .pptx or .pdf");
+    if (ext !== "pdf" && ext !== "pptx") { setLastError("Only .pptx or .pdf files are allowed"); return toast.error("Only .pptx or .pdf"); }
+    if (!signedIn) { setLastError("You must be signed in as admin to upload."); return toast.error("Sign in as admin first"); }
+
     setBusy(true);
+    setProgress(`Uploading ${(f.size / 1024 / 1024).toFixed(1)} MB…`);
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
       const path = `deck-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("presentations").upload(path, f, {
         contentType: f.type || (ext === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
@@ -690,11 +699,14 @@ function PresentationTab() {
       };
       mod.setPresentationMeta(newMeta);
       setData(pub.publicUrl); setMeta(newMeta);
-      toast.success(`✅ Presentation uploaded — ${slideCount} slides ready`);
-    } catch (e: any) {
-      toast.error(e?.message || "Upload failed");
+      toast.success(`Presentation uploaded — live on Docs page`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setLastError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -711,46 +723,76 @@ function PresentationTab() {
     toast.success("Presentation cleared");
   };
 
+  const copyLink = async () => {
+    if (!data) return;
+    await navigator.clipboard.writeText(data);
+    toast.success("Public link copied");
+  };
+
   return (
     <div className="space-y-4">
       <div>
         <h2 className="font-display text-2xl font-bold">Presentation</h2>
-        <p className="text-sm text-muted-foreground">Upload the slide deck (PPTX or PDF, max 100MB). It appears live on the <Link to="/docs" className="text-cyan hover:underline">Docs → Presentation</Link> tab for all visitors.</p>
+        <p className="text-sm text-muted-foreground">
+          Upload the slide deck (PPTX or PDF, max 100MB). It appears live on the{" "}
+          <Link to="/docs" className="text-cyan hover:underline">Docs → Presentation</Link> tab for all visitors.
+          <span className="block mt-1 text-xs">Tip: PDF gives the best in-browser preview. PPTX uploads still work — users can open/download them.</span>
+        </p>
       </div>
+
+      {signedIn === false && (
+        <div className="glass rounded-xl p-3 border-l-4 border-danger text-xs text-danger">
+          You are not signed in. <Link to="/login" search={{ mode: "admin", intent: "signin" }} className="underline">Sign in as admin</Link> to upload.
+        </div>
+      )}
 
       {meta && (
         <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
-          <FileText className="h-6 w-6 text-cyan" />
+          <FileText className="h-6 w-6 text-cyan shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="font-display truncate">{meta.filename}</div>
             <div className="text-xs text-muted-foreground">
               {(meta.size / 1024 / 1024).toFixed(2)} MB · {meta.fileType.toUpperCase()} · uploaded {new Date(meta.uploadedAt).toLocaleString()}
             </div>
           </div>
-          <button onClick={onClear} className="inline-flex items-center gap-1 text-xs text-danger hover:underline">
-            <Trash2 className="h-3 w-3" /> Clear
-          </button>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <a href={data!} target="_blank" rel="noreferrer" className="px-2 py-1 rounded border border-cyan/40 text-cyan hover:bg-cyan/10">Open</a>
+            <a href={data!} download={meta.filename} className="px-2 py-1 rounded border border-cyan/40 text-cyan hover:bg-cyan/10">Download</a>
+            <button onClick={copyLink} className="px-2 py-1 rounded border border-cyan/40 text-cyan hover:bg-cyan/10">Copy link</button>
+            <button onClick={onClear} className="px-2 py-1 rounded border border-danger/40 text-danger hover:bg-danger/10 inline-flex items-center gap-1">
+              <Trash2 className="h-3 w-3" /> Clear
+            </button>
+          </div>
         </div>
       )}
 
-      <label className="block border-2 border-dashed border-cyan/40 rounded-xl p-8 text-center cursor-pointer hover:bg-cyan/5">
+      <label className={`block border-2 border-dashed rounded-xl p-8 text-center transition ${busy ? "opacity-60 cursor-wait border-cyan/40" : signedIn === false ? "border-muted cursor-not-allowed opacity-60" : "border-cyan/40 cursor-pointer hover:bg-cyan/5"}`}>
         <Upload className="h-6 w-6 text-cyan mx-auto" />
-        <div className="mt-2 font-display font-semibold">{busy ? "Uploading…" : "Upload PPTX / PDF"}</div>
+        <div className="mt-2 font-display font-semibold">
+          {busy ? (progress ?? "Uploading…") : meta ? "Replace Deck (PPTX / PDF)" : "Upload PPTX / PDF"}
+        </div>
         <div className="text-xs text-muted-foreground">Max 100MB · Replaces current deck</div>
         <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-          className="hidden" disabled={busy}
+          className="hidden" disabled={busy || signedIn === false}
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
       </label>
 
-      <div className="glass rounded-xl p-4 flex items-center gap-3">
-        <label className="text-sm font-semibold">How many slides?</label>
+      {lastError && (
+        <div className="glass rounded-xl p-3 border-l-4 border-danger text-xs text-danger font-mono break-words">
+          {lastError}
+        </div>
+      )}
+
+      <div className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap">
+        <label className="text-sm font-semibold">Slides shown on Docs page:</label>
         <input type="number" min={1} max={100} value={slideCount} onChange={(e) => onSlides(Number(e.target.value))}
           className="w-24 rounded-md bg-[color:var(--bg-deep)] border border-[color:var(--border)] px-3 py-1.5 text-sm" />
-        <span className="text-xs text-muted-foreground">Shown as numbered slide cards on the public Docs page</span>
+        <span className="text-xs text-muted-foreground">Used for the numbered slide grid (PDF jumps to that page).</span>
       </div>
 
       {data && meta?.fileType === "pdf" && (
         <div className="glass rounded-xl p-2">
+          <div className="text-xs text-muted-foreground px-2 py-1">Preview</div>
           <iframe src={data} className="w-full h-[60vh] rounded bg-black" title="Preview" />
         </div>
       )}
