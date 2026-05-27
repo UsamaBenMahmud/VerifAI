@@ -1,6 +1,6 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X } from "lucide-react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
 import { analyze, bandFor, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
@@ -182,6 +182,21 @@ function DetectPage() {
 }
 
 function Results({ result, lang, preview, onReset, showAbout, setShowAbout, showEvidence, setShowEvidence, showCompare, setShowCompare }: any) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const shareAsImage = async () => {
+    if (!cardRef.current) return;
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(cardRef.current, { backgroundColor: "#06070b", scale: 2, logging: false, useCORS: true });
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `verifai-result-${Date.now()}.png`; a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Result image downloaded");
+      }, "image/png");
+    } catch (e) { toast.error("Could not generate image"); }
+  };
   const band = bandFor(result.score);
 
   const downloadCSV = () => {
