@@ -46,7 +46,15 @@ function DetectPage() {
   const [showCompare, setShowCompare] = useState(false);
   const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(false);
+  const [inputTab, setInputTab] = useState<"upload" | "url" | "camera">("upload");
+  const [urlVal, setUrlVal] = useState("");
+  const [urlBusy, setUrlBusy] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareFiles, setCompareFiles] = useState<{ a: File | null; b: File | null }>({ a: null, b: null });
+  const [compareResults, setCompareResults] = useState<{ a: AnalysisResult | null; b: AnalysisResult | null } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const fromParam = search?.url;
