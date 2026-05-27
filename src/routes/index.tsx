@@ -51,8 +51,9 @@ function Home() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-cyan/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-6 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan/30 bg-cyan/5 px-3 py-1 text-xs font-mono uppercase tracking-widest text-cyan">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse-dot" /> BuildFest 2026 · Track 5
+            <div className="group inline-flex items-center gap-2 rounded-full border border-cyan/40 px-4 py-2 text-[13px] font-mono uppercase tracking-widest text-cyan" style={{ background: "linear-gradient(135deg, rgba(123,47,255,0.2), rgba(0,229,255,0.2))" }}>
+              <span className="inline-block transition-transform group-hover:rotate-[5deg]">🏆</span>
+              <span>The Infinity AI BuildFest 2026 · Track 5: InfoTech · Bangladesh</span>
             </div>
             <h1 className="mt-6 font-display font-bold text-5xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
               Detect Deepfakes<br /><span className="text-cyan text-glow-cyan">in 6 Seconds</span>
