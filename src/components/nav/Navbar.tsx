@@ -1,16 +1,19 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { UserMenu } from "@/components/nav/UserMenu";
 import { AdminSessionTimer } from "@/components/nav/AdminSessionTimer";
+import { getHistory } from "@/lib/localStore";
 
 const baseLinks = [
   { to: "/", label: "Home" },
   { to: "/detect", label: "Detect" },
+  { to: "/submit-rumor", label: "🚨 Report Rumor", danger: true },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/history", label: "History", historyOnly: true },
   { to: "/laws", label: "Laws" },
   { to: "/help", label: "Help" },
   { to: "/docs", label: "Docs" },
@@ -24,8 +27,10 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState<{ email: string; id: string } | null>(null);
   const [role, setRole] = useState<"admin" | "user">("user");
+  const [hasHistory, setHasHistory] = useState(false);
 
   useEffect(() => {
+    setHasHistory(getHistory().length > 0);
     const refresh = async () => {
       const { data } = await supabase.auth.getUser();
       const u = data.user;
@@ -35,27 +40,42 @@ export function Navbar() {
       setRole(profile?.role === "admin" ? "admin" : "user");
     };
     refresh();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => { refresh(); });
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => { setOpen(false); }, [path]);
 
   const onAdminExpire = async () => {
     sessionStorage.removeItem("adminSessionStart");
     await supabase.auth.signOut();
   };
 
+  const visibleLinks = baseLinks.filter((l: any) => !l.historyOnly || hasHistory || authed);
+
   return (
     <header className="sticky top-0 z-50 glass-strong border-b border-[color:var(--border)]">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="shrink-0"><Logo /></Link>
         <ul className="hidden lg:flex items-center gap-1">
-          {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => {
+          {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l: any) => {
             const active = l.to === "/" ? path === "/" : path.startsWith(l.to);
+            const danger = !!l.danger;
             return (
               <li key={l.to}>
-                <Link to={l.to} className={`px-3 py-2 text-sm font-medium rounded-md transition ${
-                  active ? "text-cyan text-glow-cyan" : "text-muted-foreground hover:text-foreground"
-                }`}>{l.label}</Link>
+                <Link
+                  to={l.to}
+                  title={danger ? "Report suspicious content" : undefined}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 ${
+                    danger
+                      ? (active ? "text-danger" : "text-danger/80 hover:text-danger")
+                      : (active ? "text-cyan text-glow-cyan" : "text-muted-foreground hover:text-foreground")
+                  }`}
+                >
+                  {danger && <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse-dot" />}
+                  {l.label}
+                </Link>
               </li>
             );
           })}
@@ -91,9 +111,12 @@ export function Navbar() {
       {open && (
         <div className="lg:hidden border-t border-[color:var(--border)] glass-strong">
           <ul className="px-4 py-3 space-y-1">
-            {[...baseLinks, ...(role === "admin" ? [adminLink] : [])].map((l) => (
+            {[...visibleLinks, ...(role === "admin" ? [adminLink] : [])].map((l: any) => (
               <li key={l.to}>
-                <Link to={l.to} onClick={() => setOpen(false)} className="block px-3 py-2 rounded-md hover:bg-cyan/10 text-sm">{l.label}</Link>
+                <Link to={l.to} onClick={() => setOpen(false)}
+                  className={`block px-3 py-2 rounded-md text-sm ${l.danger ? "text-danger hover:bg-danger/10" : "hover:bg-cyan/10"}`}>
+                  {l.danger && <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />}{l.label}
+                </Link>
               </li>
             ))}
             {!authed ? (
