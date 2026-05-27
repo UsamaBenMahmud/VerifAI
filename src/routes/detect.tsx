@@ -110,7 +110,46 @@ function DetectPage() {
     await startAnalysis({ kind: "video", file: f });
   };
 
-  return (
+  const runDemo = async (kind: "fake" | "uncertain" | "authentic") => {
+    setShowDemo(false);
+    setStage("analyzing"); setStep(0); setElapsed(0); setError(null);
+    const t0 = Date.now();
+    const ti = setInterval(() => setElapsed((Date.now() - t0) / 1000), 100);
+    const timers = [600, 1500, 3000, 5000, 7000].map((ms, i) => setTimeout(() => setStep(i + 1), ms));
+    await new Promise(r => setTimeout(r, 7500));
+    const presets = {
+      fake: { score: 12, fp: 0.88, vEn: "Likely Deepfake", vBn: "সম্ভবত ডিপফেক" },
+      uncertain: { score: 47, fp: 0.53, vEn: "Uncertain", vBn: "অনিশ্চিত" },
+      authentic: { score: 82, fp: 0.18, vEn: "Likely Authentic", vBn: "সম্ভবত আসল" },
+    } as const;
+    const p = presets[kind];
+    const sev: Severity = p.score <= 30 ? "HIGH" : p.score <= 69 ? "MED" : "SAFE";
+    const conf = Math.min(p.score > 50 ? p.score : 100 - p.score, 95);
+    const demo: AnalysisResult = {
+      score: p.score, rawScore: p.score, confidence: conf, confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
+      subScores: {
+        vision: p.score < 40 ? 88 : p.score > 70 ? 18 : 52,
+        metadata: p.score < 40 ? 76 : p.score > 70 ? 24 : 48,
+        knowledge: p.score < 40 ? 71 : p.score > 70 ? 28 : 42,
+        audio: 0,
+      },
+      riskFactors: [
+        { severity: sev, titleEn: p.vEn, titleBn: p.vBn, detailEn: `Demo case: trust score ${p.score}/100, fake probability ${(p.fp*100).toFixed(0)}%.`, detailBn: `ডেমো: ট্রাস্ট ${p.score}/১০০।` },
+      ],
+      modelResults: [{ name: "EfficientNet-B0 (demo)", score: p.score, speedSec: 4.2, confidence: conf }],
+      source: "demo",
+      mediaUrl: undefined,
+      mediaIsVideo: false,
+    };
+    setStep(5);
+    timers.forEach(clearTimeout);
+    clearInterval(ti);
+    setResult(demo);
+    setStage("results");
+    toast.success(`Demo: ${p.vEn}`);
+  };
+
+
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
         <div>
