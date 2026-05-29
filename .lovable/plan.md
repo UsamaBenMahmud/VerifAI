@@ -1,45 +1,76 @@
-# VerifAI — Audit Against BuildFest Criteria
+# Plan: Functional Actions + Honest Scores + Slide Deck Viewer
 
-Scoring: ✅ strong · ⚠️ partial · ❌ missing
+## 1. Sub-scores — only real HF data (Image 2)
 
-## 1. Clear problem & user definition — ⚠️ Partial
-- **Present:** Hero copy names the problem (deepfakes) and users (journalists, fact-checkers, 60M citizens). BuildFest badge sets context.
-- **Gap:** No dedicated "Problem" section quantifying impact (e.g. Bangla misinformation volume, election context, % of viral fakes targeting Bangladesh). Judges scanning the home page see the tagline but no evidence of why this matters *now* in Bangladesh.
-- **Fix:** Add a `Problem` band on `/` with 3 stats + 1 short user-story card (journalist, fact-checker, citizen).
+Your HF Space returns: `fake_probability`, `real_probability`, `trust_score`, `confidence`. Everything else (Metadata 88, Context 72, Audio 0) is hardcoded and misleading.
 
-## 2. AI-native approach — ⚠️ Partial
-- **Present:** Real pipeline in `src/routes/api/analyze-image.ts` — HuggingFace EfficientNet-B2 (6-ch) deepfake detector + Lovable AI Gateway (Gemini 2.5 Flash) for bilingual explanation/risk factors. This is genuinely AI-native (ML model + LLM reasoning layer).
-- **Gap:** Nowhere in the UI explains the architecture. Marketing says "multi-agent" but only one model + one LLM call run. No RAG, no graph, no model ensemble despite `modelResults[]` shape implying it.
-- **Fix:** Either (a) add a real second signal (metadata EXIF check, reverse-image lookup via web search tool) so "multi-agent" is truthful, or (b) rewrite copy to "ML detector + LLM forensic explainer" and add a "How it works" diagram on `/docs` or `/`.
+**Fix in `src/lib/detectApi.ts` + `src/routes/detect.tsx`:**
+- Keep **2 real cards**:
+  - **Facial Artifact Score** = `100 - fake_probability*100` (real, from HF)
+  - **Model Confidence** = `confidence` from HF (real)
+- Replace Metadata / Context / Audio cards with a single **"Roadmap signals"** card listing what's coming (greyed, no fake number) — or remove entirely. Pick one in build.
+- Risk factors: drop the two hardcoded "Borderline / Moderate confidence" entries when HF returns no `risk_factors[]`. Show only what HF actually returned, plus the bilingual verdict.
 
-## 3. Basic system flow (input → AI → output) — ✅ Strong
-- Flow is implemented end-to-end: Upload/URL/Camera → Supabase Storage → HF Space (Gradio queue) → Gemini explanation → DB → UI with score, sub-scores, risk factors, bilingual verdict.
-- Sub-scores `metadata: 88` and `context: 72` are hardcoded constants — judges who read the code will notice. Either compute them or remove from the UI.
+Result: every number on screen traces back to a HF field. Judges can't catch you inventing data.
 
-## 4. Initial demo / prototype — ✅ Strong
-- Working at `/detect` with 3 input methods (Upload, URL, Live Camera) and Compare mode. Dashboard, History, Watchlist, Scoring routes exist.
-- **Gap:** Cold-start UX — HF Space sleeps and returns 503. There is handling (`HfSleepingError`) but no "wake up the model" affordance or pre-loaded demo result for judges who can't wait 30s.
-- **Fix:** Add a "Try sample video" button on `/detect` that runs against a pre-cached analysis row so the demo never depends on HF cold start.
+## 2. Action buttons — make all 7 work (Image 1)
 
-## 5. Bangla / localization — ⚠️ Partial
-- **Present:** `i18n.tsx` with en/bn toggle, `font-bangla` class, hero subtitle in Bangla, marquee Bangla string, verdict_bn + explanation_bn returned by API.
-- **Gap:** `t()` is barely used — most page copy is English-only. Toggling language likely changes very little. Bangla is decorative rather than functional.
-- **Fix:** Audit `/`, `/detect`, `/dashboard` for hardcoded English strings and route them through `t()`. Verify Bangla rendering for at least the home + detect pages.
+| Button | Implementation |
+|---|---|
+| Download PDF Report | `jspdf` — generate a real multi-page PDF from the current `AnalysisResult` (cover, verdict, score gauge, evidence list, methodology). Client-side, no server call. |
+| Share as Image | `html2canvas` on the result card → PNG → `<a download>`. |
+| Copy Link | Each analysis gets a permalink `/?a=<analysis.id>`. Detect page reads `?a=` and rehydrates from DB. Button copies the URL. |
+| Report | New `analysis_reports` table (reporter_id, analysis_id, reason). Opens a small dialog → inserts row → toast. Admin sees them in `/admin`. |
+| Embed Badge | Generate `<iframe src="https://verifaibd.lovable.app/embed/<id>" width="320" height="120">` snippet → copy to clipboard. Add minimal `/embed/$id` route showing score badge only. |
+| Compare Models | Already toggles a panel — keep, but populate from real `modelResults[]` (currently only EfficientNet-B2). Add a stub row for "Gemini explainer" using its latency. |
+| Newsroom Export (CSV) | Already works — verify it includes only real fields. |
 
-## 6. Defined potential impact (KPIs) — ❌ Missing
-- LiveStatsBar shows running counters ("47 deepfakes detected today") but these are mock/local-store values, not real KPIs tied to outcomes.
-- No stated success metrics: detection accuracy %, time-to-verdict, # journalists onboarded target, election misinformation prevented, etc.
-- **Fix:** Add an "Impact & KPIs" section (home or `/docs`) with: model accuracy on FaceForensics++/Celeb-DF benchmarks, target latency (<6s), target reach (Year-1: 1000 journalists, 50k citizens), and what success looks like.
+Two new deps: `jspdf`, `html2canvas`.
 
-## Recommended fix order (lowest effort → highest judge impact)
-1. **Problem + Impact bands on home page** — addresses criteria #1 and #6 in one edit (~30 min).
-2. **"Try sample video" button on /detect** — removes the cold-start demo risk (~20 min).
-3. **Truthful "How it works" diagram** — 3 nodes (HF detector → Gemini explainer → bilingual verdict) on `/` or `/docs` (~20 min).
-4. **Bangla i18n pass** — route home + detect copy through `t()` (~45 min).
-5. **Replace hardcoded sub-scores or remove from UI** — code honesty (~15 min).
-6. **(Stretch) Add a real second signal** — EXIF metadata check or web reverse-search so "multi-agent" is real (~1–2 hr).
+## 3. Slide-deck viewer for `/docs`
 
-## Out of scope for this audit
-Visual polish, additional routes, auth flows, payments, watchlist deepening — those exist and aren't blockers for the 6 criteria.
+You want a page that shows your pitch deck as one image per slide (like Google Slides preview), with the source `.pptx` and `.pdf` available for download.
 
-Approve this plan and I'll implement items 1–5 in build mode. Item 6 (real second signal) I'll ask before starting since it changes backend behavior.
+Database already has the `presentations` table with `slide_image_urls[]`, `pptx_url`-style fields can be added.
+
+**Admin side (`/admin`):**
+- New "Presentations" panel
+- Upload form accepting: title, `.pptx` file, `.pdf` file, and multiple slide images (one PNG/JPG per slide, in order)
+- Files go to a public `presentations` Storage bucket
+- Inserts a row in `presentations` table with `is_active=true` (deactivates previous active row)
+
+**Public side (`/docs`):**
+- Reads the active presentation
+- Shows slide images in a deck-style viewer (prev / next, slide counter, fullscreen, keyboard arrows)
+- "Download PPTX" and "Download PDF" buttons link to the storage URLs
+
+Why image-per-slide: rendering `.pptx` natively in a browser is impossible without a heavy converter. Pre-exporting slides as images (you do this once before the demo) gives pixel-perfect playback with zero runtime cost.
+
+## 4. Database changes (one migration)
+
+- `analysis_reports` table (id, analysis_id, reporter_id nullable, reason text, status, created_at) + RLS: anyone can insert, only admins can read
+- Add columns to `presentations`: `pptx_url text`, `pdf_url text`
+- Create Storage bucket `presentations` (public read, admin write)
+
+## 5. Out of scope (intentionally)
+
+- Real EXIF/C2PA metadata parsing — stays roadmap
+- Real reverse image search — stays roadmap
+- Real audio-visual sync — stays roadmap
+- Server-side PDF rendering — client-side is enough for hackathon
+
+## Technical notes
+
+- `jspdf` + `html2canvas` are pure JS, bundle ~200KB, no server runtime concerns
+- PPT/PDF storage paths: `presentations/{id}/deck.pptx`, `presentations/{id}/deck.pdf`, `presentations/{id}/slides/01.png`
+- Permalink rehydration: detect page checks `?a=<uuid>`, queries `analyses` table, renders without re-running HF
+- Embed route renders only a compact 320×120 score badge iframe, no nav
+
+## Build order
+
+1. Migration (presentations cols, analysis_reports, storage bucket)
+2. Score-cards honesty fix + risk-factor cleanup
+3. Permalink rehydration + Copy Link + Embed route + Embed Badge
+4. PDF + Share as Image (install deps)
+5. Report dialog + admin list
+6. Admin presentation upload + `/docs` deck viewer
