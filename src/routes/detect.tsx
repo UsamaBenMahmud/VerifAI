@@ -407,13 +407,13 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
   const downloadCSV = () => {
     const rows = [
       ["field", "value"],
-      ["score", result.score],
-      ["confidence", `${result.confidence}% ± ${result.confidenceMargin}%`],
+      ["analysis_id", result.id ?? ""],
+      ["trust_score", result.score],
+      ["raw_model_score", result.rawScore ?? ""],
+      ["confidence_pct", `${result.confidence}% ± ${result.confidenceMargin}%`],
       ["band", band.en],
-      ["vision_score", result.subScores.vision],
-      ["metadata_score", result.subScores.metadata],
-      ["knowledge_score", result.subScores.knowledge],
-      ["audio_score", result.subScores.audio],
+      ["facial_artifact_score", result.subScores.vision],
+      ["model", result.modelResults[0]?.name ?? ""],
       ["source", result.source],
       ...result.riskFactors.map((r: any) => [`risk_${r.severity}`, r.titleEn]),
     ];
@@ -423,6 +423,31 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
     const a = document.createElement("a"); a.href = url; a.download = `verifai-report-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exported");
+  };
+
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const copyShareLink = async () => {
+    if (!result.id) return toast.error("No analysis id available yet");
+    const link = `${window.location.origin}/?a=${result.id}`;
+    await navigator.clipboard.writeText(link);
+    toast.success("Share link copied");
+  };
+
+  const copyEmbedSnippet = async () => {
+    if (!result.id) return toast.error("No analysis id available yet");
+    const snippet = `<iframe src="${window.location.origin}/embed/${result.id}" width="340" height="100" frameborder="0" style="border:0;border-radius:8px;overflow:hidden" title="VerifAI trust badge"></iframe>`;
+    await navigator.clipboard.writeText(snippet);
+    toast.success("Embed snippet copied");
+  };
+
+  const downloadPDF = () => {
+    try {
+      generateAnalysisPDF(result, result.id ?? null);
+      toast.success("PDF report downloaded");
+    } catch (e: any) {
+      toast.error(e?.message || "PDF generation failed");
+    }
   };
 
   return (
