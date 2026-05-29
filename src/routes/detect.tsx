@@ -189,10 +189,8 @@ function DetectPage() {
     const demo: AnalysisResult = {
       score: p.score, rawScore: p.score, confidence: conf, confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
       subScores: {
-        vision: p.score < 40 ? 88 : p.score > 70 ? 18 : 52,
-        metadata: p.score < 40 ? 76 : p.score > 70 ? 24 : 48,
-        knowledge: p.score < 40 ? 71 : p.score > 70 ? 28 : 42,
-        audio: 0,
+        vision: p.score < 40 ? 12 : p.score > 70 ? 82 : 47,
+        confidence: conf,
       },
       riskFactors: [
         { severity: sev, titleEn: p.vEn, titleBn: p.vBn, detailEn: `Demo case: trust score ${p.score}/100, fake probability ${(p.fp*100).toFixed(0)}%.`, detailBn: `ডেমো: ট্রাস্ট ${p.score}/১০০।` },
