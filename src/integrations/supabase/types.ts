@@ -107,6 +107,36 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_reports: {
+        Row: {
+          analysis_id: string
+          created_at: string
+          id: string
+          reason: string
+          reporter_email: string | null
+          reporter_id: string | null
+          status: string
+        }
+        Insert: {
+          analysis_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          reporter_email?: string | null
+          reporter_id?: string | null
+          status?: string
+        }
+        Update: {
+          analysis_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          reporter_email?: string | null
+          reporter_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       presentations: {
         Row: {
           created_at: string | null
@@ -115,6 +145,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           original_filename: string | null
+          pdf_url: string | null
+          pptx_url: string | null
           slide_count: number | null
           slide_image_urls: string[] | null
           title: string
@@ -128,6 +160,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           original_filename?: string | null
+          pdf_url?: string | null
+          pptx_url?: string | null
           slide_count?: number | null
           slide_image_urls?: string[] | null
           title?: string
@@ -141,6 +175,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           original_filename?: string | null
+          pdf_url?: string | null
+          pptx_url?: string | null
           slide_count?: number | null
           slide_image_urls?: string[] | null
           title?: string
