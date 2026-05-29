@@ -6,15 +6,15 @@
 export type Severity = "HIGH" | "MED" | "LOW" | "SAFE";
 
 export type AnalysisResult = {
+  id?: string | null; // DB id (for permalinks, reports, embed)
   score: number; // 0-100, higher = more authentic (calibrated)
   rawScore?: number; // uncalibrated model output
   confidence: number;
   confidenceMargin: number;
+  // Only signals derived from the HF model. Other forensic checks are roadmap.
   subScores: {
     vision: number;
-    metadata: number;
-    knowledge: number;
-    audio: number;
+    confidence: number;
   };
   riskFactors: Array<{
     severity: Severity;
