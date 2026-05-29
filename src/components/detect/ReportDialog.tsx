@@ -10,6 +10,7 @@ export function ReportDialog({ analysisId, onClose }: { analysisId: string | nul
 
   const submit = async () => {
     if (!reason.trim()) return toast.error("Tell us why you're reporting this");
+    if (!analysisId) return toast.error("Run an analysis first");
     setBusy(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
