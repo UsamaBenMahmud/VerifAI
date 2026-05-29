@@ -1,12 +1,15 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles, Link2, Camera, Layers } from "lucide-react";
+import { Upload, FileText, Share2, Flag, Code2, ChevronDown, Beaker, Download, X, Image as ImageIcon, Play, Sparkles, Link2, Camera, Layers, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useLang, t } from "@/lib/i18n";
 import { analyze, bandFor, calibrateScore, isValidUrl, MAX_BYTES, ACCEPT, type AnalysisResult, type AnalyzeInput, type Severity } from "@/lib/detectApi";
 import { pushHistory } from "@/lib/localStore";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CameraRecorder } from "@/components/detect/CameraRecorder";
+import { ReportDialog } from "@/components/detect/ReportDialog";
+import { generateAnalysisPDF } from "@/lib/generatePdf";
+
 
 
 export const Route = createFileRoute("/detect")({
@@ -186,10 +189,8 @@ function DetectPage() {
     const demo: AnalysisResult = {
       score: p.score, rawScore: p.score, confidence: conf, confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
       subScores: {
-        vision: p.score < 40 ? 88 : p.score > 70 ? 18 : 52,
-        metadata: p.score < 40 ? 76 : p.score > 70 ? 24 : 48,
-        knowledge: p.score < 40 ? 71 : p.score > 70 ? 28 : 42,
-        audio: 0,
+        vision: p.score < 40 ? 12 : p.score > 70 ? 82 : 47,
+        confidence: conf,
       },
       riskFactors: [
         { severity: sev, titleEn: p.vEn, titleBn: p.vBn, detailEn: `Demo case: trust score ${p.score}/100, fake probability ${(p.fp*100).toFixed(0)}%.`, detailBn: `ডেমো: ট্রাস্ট ${p.score}/১০০।` },
@@ -406,13 +407,13 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
   const downloadCSV = () => {
     const rows = [
       ["field", "value"],
-      ["score", result.score],
-      ["confidence", `${result.confidence}% ± ${result.confidenceMargin}%`],
+      ["analysis_id", result.id ?? ""],
+      ["trust_score", result.score],
+      ["raw_model_score", result.rawScore ?? ""],
+      ["confidence_pct", `${result.confidence}% ± ${result.confidenceMargin}%`],
       ["band", band.en],
-      ["vision_score", result.subScores.vision],
-      ["metadata_score", result.subScores.metadata],
-      ["knowledge_score", result.subScores.knowledge],
-      ["audio_score", result.subScores.audio],
+      ["facial_artifact_score", result.subScores.vision],
+      ["model", result.modelResults[0]?.name ?? ""],
       ["source", result.source],
       ...result.riskFactors.map((r: any) => [`risk_${r.severity}`, r.titleEn]),
     ];
@@ -422,6 +423,31 @@ function Results({ result, lang, preview, onReset, showAbout, setShowAbout, show
     const a = document.createElement("a"); a.href = url; a.download = `verifai-report-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exported");
+  };
+
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const copyShareLink = async () => {
+    if (!result.id) return toast.error("No analysis id available yet");
+    const link = `${window.location.origin}/?a=${result.id}`;
+    await navigator.clipboard.writeText(link);
+    toast.success("Share link copied");
+  };
+
+  const copyEmbedSnippet = async () => {
+    if (!result.id) return toast.error("No analysis id available yet");
+    const snippet = `<iframe src="${window.location.origin}/embed/${result.id}" width="340" height="100" frameborder="0" style="border:0;border-radius:8px;overflow:hidden" title="VerifAI trust badge"></iframe>`;
+    await navigator.clipboard.writeText(snippet);
+    toast.success("Embed snippet copied");
+  };
+
+  const downloadPDF = () => {
+    try {
+      generateAnalysisPDF(result, result.id ?? null);
+      toast.success("PDF report downloaded");
+    } catch (e: any) {
+      toast.error(e?.message || "PDF generation failed");
+    }
   };
 
   return (
@@ -689,10 +715,8 @@ function CompareResults({ a, b, onReset, lang }: { a: AnalysisResult; b: Analysi
             <div className="mt-1 text-sm font-semibold" style={{ color: s.band.color }}>{t(s.band.en, s.band.bn, lang)}</div>
             <div className="mt-3 text-xs font-mono text-muted-foreground">Confidence {s.r.confidence.toFixed(1)}% ± {s.r.confidenceMargin.toFixed(1)}%</div>
             <div className="mt-4 space-y-1.5 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Vision</span><span className="font-mono">{s.r.subScores.vision}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Metadata</span><span className="font-mono">{s.r.subScores.metadata}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Knowledge</span><span className="font-mono">{s.r.subScores.knowledge}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Audio sync</span><span className="font-mono">{s.r.subScores.audio || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Facial Artifact</span><span className="font-mono">{s.r.subScores.vision}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Model Confidence</span><span className="font-mono">{s.r.subScores.confidence}</span></div>
             </div>
           </div>
         ))}

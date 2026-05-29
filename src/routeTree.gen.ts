@@ -24,6 +24,7 @@ import { Route as DetectRouteImport } from './routes/detect'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EmbedIdRouteImport } from './routes/embed.$id'
 import { Route as ApiAnalyzeImageRouteImport } from './routes/api/analyze-image'
 
 const WatchlistRoute = WatchlistRouteImport.update({
@@ -101,6 +102,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmbedIdRoute = EmbedIdRouteImport.update({
+  id: '/embed/$id',
+  path: '/embed/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnalyzeImageRoute = ApiAnalyzeImageRouteImport.update({
   id: '/api/analyze-image',
   path: '/api/analyze-image',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/submit-rumor': typeof SubmitRumorRoute
   '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
+  '/embed/$id': typeof EmbedIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/submit-rumor': typeof SubmitRumorRoute
   '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
+  '/embed/$id': typeof EmbedIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/submit-rumor': typeof SubmitRumorRoute
   '/watchlist': typeof WatchlistRoute
   '/api/analyze-image': typeof ApiAnalyzeImageRoute
+  '/embed/$id': typeof EmbedIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/submit-rumor'
     | '/watchlist'
     | '/api/analyze-image'
+    | '/embed/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/submit-rumor'
     | '/watchlist'
     | '/api/analyze-image'
+    | '/embed/$id'
   id:
     | '__root__'
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/submit-rumor'
     | '/watchlist'
     | '/api/analyze-image'
+    | '/embed/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   SubmitRumorRoute: typeof SubmitRumorRoute
   WatchlistRoute: typeof WatchlistRoute
   ApiAnalyzeImageRoute: typeof ApiAnalyzeImageRoute
+  EmbedIdRoute: typeof EmbedIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/embed/$id': {
+      id: '/embed/$id'
+      path: '/embed/$id'
+      fullPath: '/embed/$id'
+      preLoaderRoute: typeof EmbedIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/analyze-image': {
       id: '/api/analyze-image'
       path: '/api/analyze-image'
@@ -372,17 +392,8 @@ const rootRouteChildren: RootRouteChildren = {
   SubmitRumorRoute: SubmitRumorRoute,
   WatchlistRoute: WatchlistRoute,
   ApiAnalyzeImageRoute: ApiAnalyzeImageRoute,
+  EmbedIdRoute: EmbedIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
