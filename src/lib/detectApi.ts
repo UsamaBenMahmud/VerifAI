@@ -126,15 +126,14 @@ export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promis
       ];
 
   return {
+    id: d.id ?? null,
     score,
     rawScore,
     confidence: conf,
     confidenceMargin: Math.max(3, Math.floor((100 - conf) / 8)),
     subScores: {
       vision: visionVal,
-      metadata: metadataVal,
-      knowledge: contextVal,
-      audio: audioVal,
+      confidence: conf,
     },
     riskFactors,
     modelResults: [
