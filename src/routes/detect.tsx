@@ -690,10 +690,8 @@ function CompareResults({ a, b, onReset, lang }: { a: AnalysisResult; b: Analysi
             <div className="mt-1 text-sm font-semibold" style={{ color: s.band.color }}>{t(s.band.en, s.band.bn, lang)}</div>
             <div className="mt-3 text-xs font-mono text-muted-foreground">Confidence {s.r.confidence.toFixed(1)}% ± {s.r.confidenceMargin.toFixed(1)}%</div>
             <div className="mt-4 space-y-1.5 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Vision</span><span className="font-mono">{s.r.subScores.vision}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Metadata</span><span className="font-mono">{s.r.subScores.metadata}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Knowledge</span><span className="font-mono">{s.r.subScores.knowledge}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Audio sync</span><span className="font-mono">{s.r.subScores.audio || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Facial Artifact</span><span className="font-mono">{s.r.subScores.vision}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Model Confidence</span><span className="font-mono">{s.r.subScores.confidence}</span></div>
             </div>
           </div>
         ))}
